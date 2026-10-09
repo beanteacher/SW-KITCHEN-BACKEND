@@ -1,0 +1,6 @@
+# 비밀번호가 git 에 남지 않도록 접속 정보는 서버 환경 변수로만 받는다. 값이 없으면 앱이 뜨지 않는다
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
