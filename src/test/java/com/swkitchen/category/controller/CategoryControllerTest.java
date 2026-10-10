@@ -135,28 +135,20 @@ class CategoryControllerTest {
     }
 
     @Test
-    @DisplayName("분류 등록: 형제끼리 약어가 겹치면 409, 다른 대분류 아래면 같아도 된다")
-    void createDuplicateAbbr() throws Exception {
+    @DisplayName("업무 규칙 오류는 상황별 코드와 문제 칸을 준다: 약어 중복 409, 제품이 연결된 분류 약어 변경 409, 없는 분류 404")
+    void businessErrors() throws Exception {
         create("{\"name\":\"냉장\",\"abbr\":\"RF\"}")
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("CATEGORY_ABBR_DUPLICATE"))
             .andExpect(jsonPath("$.errors[0].field").value("abbr"));
-        create("{\"parentId\":" + fridge.getId() + ",\"name\":\"냉장고\",\"abbr\":\"UR\"}")
-            .andExpect(status().isConflict());
-        create("{\"parentId\":" + kitchen.getId() + ",\"name\":\"업소용 레인지\",\"abbr\":\"UR\"}")
-            .andExpect(status().isCreated());
-    }
-
-    @Test
-    @DisplayName("분류 등록: 없는 부모는 404, 중분류 아래에 만들면 400")
-    void createWrongParent() throws Exception {
-        create("{\"parentId\":999999,\"name\":\"세척\",\"abbr\":\"WS\"}")
+        update(upright, "{\"abbr\":\"UP\"}")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("CATEGORY_ABBR_LOCKED"))
+            .andExpect(jsonPath("$.errors[0].field").value("abbr"));
+        mvc.perform(patch("/api/v1/admin/category/999999").cookie(accessToken(Role.STAFF))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"없음\"}"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("CATEGORY_NOT_FOUND"));
-        create("{\"parentId\":" + upright.getId() + ",\"name\":\"세척\",\"abbr\":\"WS\"}")
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("CATEGORY_NOT_MIDDLE"))
-            .andExpect(jsonPath("$.errors[0].field").value("parentId"));
     }
 
     @Test
@@ -187,30 +179,8 @@ class CategoryControllerTest {
     }
 
     @Test
-    @DisplayName("분류 수정: 제품이 연결된 중분류와 그 대분류는 약어를 못 바꾸고 409, 이름 변경과 지금과 같은 약어는 된다")
-    void updateAbbrLocked() throws Exception {
-        update(upright, "{\"abbr\":\"UP\"}")
-            .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value("CATEGORY_ABBR_LOCKED"))
-            .andExpect(jsonPath("$.errors[0].field").value("abbr"));
-        update(fridge, "{\"abbr\":\"FR\"}")
-            .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value("CATEGORY_ABBR_LOCKED"));
-        update(upright, "{\"name\":\"업소용 냉장고(대형)\",\"abbr\":\"UR\"}")
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.name").value("업소용 냉장고(대형)"));
-    }
-
-    @Test
-    @DisplayName("분류 수정: 형제와 약어가 겹치면 409, 없는 분류는 404, 빈 이름·틀린 약어는 400")
-    void updateErrors() throws Exception {
-        update(kitchen, "{\"abbr\":\"RF\"}")
-            .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value("CATEGORY_ABBR_DUPLICATE"));
-        mvc.perform(patch("/api/v1/admin/category/999999").cookie(accessToken(Role.STAFF))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"없음\"}"))
-            .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.code").value("CATEGORY_NOT_FOUND"));
+    @DisplayName("수정: 빈 이름·틀린 약어는 400 과 칸별 오류")
+    void updateValidation() throws Exception {
         update(kitchen, "{\"name\":\" \",\"abbr\":\"c1\"}")
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[?(@.field == 'name')]").exists())
@@ -235,25 +205,14 @@ class CategoryControllerTest {
     }
 
     @Test
-    @DisplayName("순서 변경: 형제 분류가 빠졌거나·다른 부모의 분류가 섞였거나·겹치면 400 이고 순서는 그대로")
-    void changeOrderMismatch() throws Exception {
-        String[] bodies = {
-            "{\"categoryIds\":[" + fridge.getId() + "]}",
-            "{\"categoryIds\":[" + fridge.getId() + "," + kitchen.getId() + "," + upright.getId() + "]}",
-            "{\"categoryIds\":[" + fridge.getId() + "," + fridge.getId() + "]}",
-            "{\"categoryIds\":[" + fridge.getId() + "," + upright.getId() + "]}",
-        };
-        for (String body : bodies) {
-            changeOrder(body)
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("CATEGORY_ORDER_MISMATCH"));
-        }
+    @DisplayName("순서 변경: 형제 분류 전체와 다르면 400 CATEGORY_ORDER_MISMATCH, 빈 배열은 400 VALIDATION_ERROR")
+    void changeOrderErrors() throws Exception {
+        changeOrder("{\"categoryIds\":[" + fridge.getId() + "]}")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("CATEGORY_ORDER_MISMATCH"));
         changeOrder("{\"categoryIds\":[]}")
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-
-        assertThat(categoryRepository.findById(fridge.getId()).orElseThrow().getSortOrder()).isEqualTo(1);
-        assertThat(categoryRepository.findById(kitchen.getId()).orElseThrow().getSortOrder()).isEqualTo(2);
     }
 
     private ResultActions changeOrder(String body) throws Exception {

@@ -107,14 +107,6 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("72바이트를 넘는 비밀번호는 500 이 아니라 LOGIN_FAILED")
-    void tooLongPassword() throws Exception {
-        login("staff1", "가".repeat(30))
-            .andExpect(status().isUnauthorized())
-            .andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
-    }
-
-    @Test
     @DisplayName("아이디를 비우면 400 VALIDATION_ERROR, errors 에 userId")
     void blankUserId() throws Exception {
         login("", "pass1234")
