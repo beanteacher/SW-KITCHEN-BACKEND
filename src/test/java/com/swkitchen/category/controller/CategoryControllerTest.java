@@ -2,6 +2,7 @@ package com.swkitchen.category.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -165,6 +166,59 @@ class CategoryControllerTest {
             .andExpect(status().isForbidden());
 
         assertThat(categoryRepository.count()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("분류 수정: 보낸 값만 바꾸고 제품이 없는 분류는 약어도 바꾼다")
+    void update() throws Exception {
+        update(kitchen, "{\"name\":\"조리기기\"}")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.name").value("조리기기"))
+            .andExpect(jsonPath("$.data.abbr").value("KT"));
+        update(kitchen, "{\"abbr\":\"CK\"}")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.name").value("조리기기"))
+            .andExpect(jsonPath("$.data.abbr").value("CK"));
+
+        Category saved = categoryRepository.findById(kitchen.getId()).orElseThrow();
+        assertThat(saved.getName()).isEqualTo("조리기기");
+        assertThat(saved.getAbbr()).isEqualTo("CK");
+    }
+
+    @Test
+    @DisplayName("분류 수정: 제품이 연결된 중분류와 그 대분류는 약어를 못 바꾸고 409, 이름 변경과 지금과 같은 약어는 된다")
+    void updateAbbrLocked() throws Exception {
+        update(upright, "{\"abbr\":\"UP\"}")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("CATEGORY_ABBR_LOCKED"))
+            .andExpect(jsonPath("$.errors[0].field").value("abbr"));
+        update(fridge, "{\"abbr\":\"FR\"}")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("CATEGORY_ABBR_LOCKED"));
+        update(upright, "{\"name\":\"업소용 냉장고(대형)\",\"abbr\":\"UR\"}")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.name").value("업소용 냉장고(대형)"));
+    }
+
+    @Test
+    @DisplayName("분류 수정: 형제와 약어가 겹치면 409, 없는 분류는 404, 빈 이름·틀린 약어는 400")
+    void updateErrors() throws Exception {
+        update(kitchen, "{\"abbr\":\"RF\"}")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("CATEGORY_ABBR_DUPLICATE"));
+        mvc.perform(patch("/api/v1/admin/category/999999").cookie(accessToken(Role.STAFF))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"없음\"}"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("CATEGORY_NOT_FOUND"));
+        update(kitchen, "{\"name\":\" \",\"abbr\":\"c1\"}")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[?(@.field == 'name')]").exists())
+            .andExpect(jsonPath("$.errors[?(@.field == 'abbr')]").exists());
+    }
+
+    private ResultActions update(Category category, String body) throws Exception {
+        return mvc.perform(patch("/api/v1/admin/category/" + category.getId()).cookie(accessToken(Role.STAFF))
+            .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
     private ResultActions create(String body) throws Exception {

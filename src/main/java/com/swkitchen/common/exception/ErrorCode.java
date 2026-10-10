@@ -20,6 +20,8 @@ public enum ErrorCode {
     // 분류는 대분류·중분류 두 단계뿐이다
     CATEGORY_NOT_MIDDLE(HttpStatus.BAD_REQUEST, "분류 단계가 맞지 않습니다."),
     CATEGORY_ABBR_DUPLICATE(HttpStatus.CONFLICT, "이미 쓰고 있는 약어입니다."),
+    // 약어가 상품 코드 앞부분에 들어가므로 제품이 생긴 뒤에는 못 바꾼다
+    CATEGORY_ABBR_LOCKED(HttpStatus.CONFLICT, "제품이 연결된 분류는 약어를 바꿀 수 없습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 요청 형식입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");

@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,5 +36,14 @@ public class AdminCategoryController {
         CategoryDto.Response category = categoryService.create(request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(category));
+    }
+
+    @PatchMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<CategoryDto.Response>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody CategoryDto.UpdateRequest request) {
+        CategoryDto.Response category = categoryService.update(id, request);
+
+        return ResponseEntity.ok(ApiResponse.success(category));
     }
 }

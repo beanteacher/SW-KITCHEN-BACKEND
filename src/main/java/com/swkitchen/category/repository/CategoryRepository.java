@@ -1,6 +1,7 @@
 package com.swkitchen.category.repository;
 
 import com.swkitchen.category.domain.Category;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -10,4 +11,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     boolean existsByParentIdAndAbbr(Long parentId, String abbr);
 
     Optional<Category> findTopByParentIdOrderBySortOrderDesc(Long parentId);
+
+    List<Category> findByParentId(Long parentId);
 }

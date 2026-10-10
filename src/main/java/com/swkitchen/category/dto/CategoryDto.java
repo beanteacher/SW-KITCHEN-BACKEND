@@ -19,6 +19,12 @@ public class CategoryDto {
             @NotNull(message = "약어를 입력해 주세요.") @Pattern(regexp = "^[A-Z]{2}$", message = "약어는 영문 대문자 2자입니다.") String abbr) {
     }
 
+    // 보낸 값만 바꾼다 (null 이면 그대로). 부모는 바꾸지 않는다
+    public record UpdateRequest(
+            @Pattern(regexp = "(?s).*\\S.*", message = "분류 이름을 입력해 주세요.") @Size(max = 20, message = "분류 이름은 20자 이하입니다.") String name,
+            @Pattern(regexp = "^[A-Z]{2}$", message = "약어는 영문 대문자 2자입니다.") String abbr) {
+    }
+
     public record Response(Long id, Long parentId, String name, String abbr, int sortOrder) {
 
         public static Response from(Category category) {

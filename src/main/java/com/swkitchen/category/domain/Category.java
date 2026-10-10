@@ -39,6 +39,14 @@ public class Category {
         return category;
     }
 
+    public void changeName(String name) {
+        this.name = name;
+    }
+
+    public void changeAbbr(String abbr) {
+        this.abbr = abbr;
+    }
+
     public boolean isTop() {
         return parentId == null;
     }

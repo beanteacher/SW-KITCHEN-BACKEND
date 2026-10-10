@@ -8,6 +8,7 @@ import com.swkitchen.common.exception.AppException;
 import com.swkitchen.common.exception.ErrorCode;
 import com.swkitchen.product.dto.ProductDto;
 import com.swkitchen.product.repository.ProductRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -75,6 +76,37 @@ public class CategoryService {
             Category.create(request.parentId(), request.name(), request.abbr(), sortOrder));
 
         return CategoryDto.Response.from(category);
+    }
+
+    /** 제품이 연결된 분류(대분류는 아래 중분류 포함)는 약어를 바꿀 수 없다 */
+    public CategoryDto.Response update(Long id, CategoryDto.UpdateRequest request) {
+        Category category = categoryRepository.findById(id)
+            .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        if (request.abbr() != null && !request.abbr().equals(category.getAbbr())) {
+            if (hasProducts(category)) {
+                throw new AppException(ErrorCode.CATEGORY_ABBR_LOCKED,
+                    List.of(new ErrorResponse.FieldError("abbr", ErrorCode.CATEGORY_ABBR_LOCKED.getMessage())));
+            }
+            if (categoryRepository.existsByParentIdAndAbbr(category.getParentId(), request.abbr())) {
+                throw new AppException(ErrorCode.CATEGORY_ABBR_DUPLICATE,
+                    List.of(new ErrorResponse.FieldError("abbr", ErrorCode.CATEGORY_ABBR_DUPLICATE.getMessage())));
+            }
+            category.changeAbbr(request.abbr());
+        }
+        if (request.name() != null) {
+            category.changeName(request.name());
+        }
+
+        return CategoryDto.Response.from(category);
+    }
+
+    private boolean hasProducts(Category category) {
+        List<Long> categoryIds = new ArrayList<>(List.of(category.getId()));
+        if (category.isTop()) {
+            categoryRepository.findByParentId(category.getId()).forEach(child -> categoryIds.add(child.getId()));
+        }
+        return productRepository.existsByCategoryIdIn(categoryIds);
     }
 
     // 분류는 수십 개라 한 번에 읽어 메모리에서 트리로 묶는다
