@@ -6,6 +6,7 @@ import com.swkitchen.common.config.ImageProperties;
 import com.swkitchen.common.dto.ErrorResponse;
 import com.swkitchen.common.exception.AppException;
 import com.swkitchen.common.exception.ErrorCode;
+import com.swkitchen.product.domain.Dimensions;
 import com.swkitchen.product.domain.OptionImage;
 import com.swkitchen.product.domain.Product;
 import com.swkitchen.product.domain.ProductCodeSequence;
@@ -174,12 +175,8 @@ public class ProductService {
             ProductOption option = existingById.get(req.id());
             option.change(
                 req.modelName(),
-                req.widthMm(),
-                req.depthMm(),
-                req.heightMm(),
-                req.listPrice(),
-                req.discountType(),
-                req.discountValue(),
+                req.toDimensions(),
+                req.toPrice(),
                 stockQty(request.salesType(), req),
                 req.mainImageKey());
             saveOptionImages(option, req.imageKeys());
@@ -227,12 +224,8 @@ public class ProductService {
         ProductOption option = productOptionRepository.save(ProductOption.create(
             product,
             req.modelName(),
-            req.widthMm(),
-            req.depthMm(),
-            req.heightMm(),
-            req.listPrice(),
-            req.discountType(),
-            req.discountValue(),
+            req.toDimensions(),
+            req.toPrice(),
             stockQty(salesType, req),
             req.mainImageKey()));
         saveOptionImages(option, req.imageKeys());
@@ -258,10 +251,9 @@ public class ProductService {
 
     /** 뒤에 나온 쪽에 오류를 붙인다. 사양 이름은 앞뒤 공백을 빼고 비교한다 */
     private static void checkDuplicates(ProductDto.SaveRequest request) {
-        Set<List<Integer>> sizes = new HashSet<>();
+        Set<Dimensions> sizes = new HashSet<>();
         for (int i = 0; i < request.options().size(); i++) {
-            ProductDto.OptionRequest option = request.options().get(i);
-            if (!sizes.add(List.of(option.widthMm(), option.depthMm(), option.heightMm()))) {
+            if (!sizes.add(request.options().get(i).toDimensions())) {
                 throw fieldError(ErrorCode.OPTION_SIZE_DUPLICATE, "options[%d].widthMm".formatted(i));
             }
         }

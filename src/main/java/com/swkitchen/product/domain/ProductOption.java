@@ -1,9 +1,8 @@
 package com.swkitchen.product.domain;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -41,26 +40,11 @@ public class ProductOption {
     @Column(length = 100)
     private String modelName;
 
-    @Column(nullable = false)
-    private int widthMm;
+    @Embedded
+    private Dimensions dimensions;
 
-    @Column(nullable = false)
-    private int depthMm;
-
-    @Column(nullable = false)
-    private int heightMm;
-
-    @Column(nullable = false)
-    private int listPrice;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
-    private DiscountType discountType;
-
-    private Integer discountValue;
-
-    @Column(nullable = false)
-    private int salePrice;
+    @Embedded
+    private Price price;
 
     private Integer stockQty;
 
@@ -84,48 +68,27 @@ public class ProductOption {
     private LocalDateTime updatedAt;
 
     /** 제품에서 옵션 번호를 하나 발급받는다 */
-    public static ProductOption create(Product product, String modelName, int widthMm, int depthMm, int heightMm,
-            int listPrice, DiscountType discountType, Integer discountValue, Integer stockQty, String mainImageKey) {
+    public static ProductOption create(
+            Product product,
+            String modelName,
+            Dimensions dimensions,
+            Price price,
+            Integer stockQty,
+            String mainImageKey) {
         ProductOption option = new ProductOption();
         option.product = product;
         option.optionNo = product.nextOptionNo();
         option.productCode = "%s-%02d".formatted(product.getCodePrefix(), option.optionNo);
-        option.modelName = modelName;
-        option.widthMm = widthMm;
-        option.depthMm = depthMm;
-        option.heightMm = heightMm;
-        option.changePrice(listPrice, discountType, discountValue);
-        option.stockQty = stockQty;
-        option.mainImageKey = mainImageKey;
+        option.change(modelName, dimensions, price, stockQty, mainImageKey);
         return option;
     }
 
     /** 상품 코드·잡아 둔 수량은 바꾸지 않는다 */
-    public void change(String modelName, int widthMm, int depthMm, int heightMm, int listPrice,
-            DiscountType discountType, Integer discountValue, Integer stockQty, String mainImageKey) {
+    public void change(String modelName, Dimensions dimensions, Price price, Integer stockQty, String mainImageKey) {
         this.modelName = modelName;
-        this.widthMm = widthMm;
-        this.depthMm = depthMm;
-        this.heightMm = heightMm;
-        changePrice(listPrice, discountType, discountValue);
+        this.dimensions = dimensions;
+        this.price = price;
         this.stockQty = stockQty;
         this.mainImageKey = mainImageKey;
-    }
-
-    public void changePrice(int listPrice, DiscountType discountType, Integer discountValue) {
-        this.listPrice = listPrice;
-        this.discountType = discountType;
-        // 할인 없음이면 화면에 남아 있던 값을 버린다
-        this.discountValue = discountType == DiscountType.NONE ? null : discountValue;
-        this.salePrice = salePrice(listPrice, discountType, discountValue);
-    }
-
-    /** 정률은 100원 미만을 버린다 */
-    static int salePrice(int listPrice, DiscountType discountType, Integer discountValue) {
-        return switch (discountType) {
-            case NONE -> listPrice;
-            case RATE -> (int) ((long) listPrice * (100 - discountValue) / 10_000 * 100);
-            case AMOUNT -> listPrice - discountValue;
-        };
     }
 }

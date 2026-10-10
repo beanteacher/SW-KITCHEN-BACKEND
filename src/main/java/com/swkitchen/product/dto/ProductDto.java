@@ -1,9 +1,11 @@
 package com.swkitchen.product.dto;
 
 import com.swkitchen.category.domain.Category;
+import com.swkitchen.product.domain.Dimensions;
 import com.swkitchen.product.domain.DiscountType;
 import com.swkitchen.product.domain.Material;
 import com.swkitchen.product.domain.OptionImage;
+import com.swkitchen.product.domain.Price;
 import com.swkitchen.product.domain.Product;
 import com.swkitchen.product.domain.ProductDetailImage;
 import com.swkitchen.product.domain.ProductImage;
@@ -71,6 +73,14 @@ public class ProductDto {
             @NotNull(message = "대표 이미지를 올려 주세요.") @Pattern(regexp = IMAGE_KEY, message = IMAGE_KEY_MESSAGE) String mainImageKey,
             @Size(max = 10, message = "옵션 추가 이미지는 10장까지입니다.")
             List<@NotNull(message = IMAGE_KEY_MESSAGE) @Pattern(regexp = IMAGE_KEY, message = IMAGE_KEY_MESSAGE) String> imageKeys) {
+
+        public Dimensions toDimensions() {
+            return new Dimensions(widthMm, depthMm, heightMm);
+        }
+
+        public Price toPrice() {
+            return Price.of(listPrice, discountType, discountValue);
+        }
     }
 
     // 관리 화면(등록·수정)용 전체 데이터. 고객용 상세에 모델명·재고·잡아 둔 수량·version·이미지 키를 더한다
@@ -186,6 +196,8 @@ public class ProductDto {
                 ProductOption option,
                 List<OptionImage> images,
                 UnaryOperator<String> urlOf) {
+            Dimensions dimensions = option.getDimensions();
+            Price price = option.getPrice();
             List<ImageResponse> imageResponses = images.stream()
                 .map(image -> ImageResponse.of(image.getImageKey(), urlOf))
                 .toList();
@@ -195,13 +207,13 @@ public class ProductDto {
                 option.getVersion(),
                 option.getProductCode(),
                 option.getModelName(),
-                option.getWidthMm(),
-                option.getDepthMm(),
-                option.getHeightMm(),
-                option.getListPrice(),
-                option.getDiscountType(),
-                option.getDiscountValue(),
-                option.getSalePrice(),
+                dimensions.widthMm(),
+                dimensions.depthMm(),
+                dimensions.heightMm(),
+                price.getListPrice(),
+                price.getDiscountType(),
+                price.getDiscountValue(),
+                price.getSalePrice(),
                 option.getStockQty(),
                 option.getReservedQty(),
                 ImageResponse.of(option.getMainImageKey(), urlOf),
