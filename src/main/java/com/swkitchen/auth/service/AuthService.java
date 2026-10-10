@@ -5,6 +5,7 @@ import com.swkitchen.auth.domain.RefreshToken;
 import com.swkitchen.auth.dto.AuthDto;
 import com.swkitchen.auth.repository.AccountRepository;
 import com.swkitchen.auth.repository.RefreshTokenRepository;
+import com.swkitchen.common.dto.ErrorResponse;
 import com.swkitchen.common.exception.AppException;
 import com.swkitchen.common.exception.ErrorCode;
 import com.swkitchen.common.security.JwtProvider;
@@ -16,6 +17,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -60,6 +62,23 @@ public class AuthService {
     public void logout(Long accountId, String refreshToken) {
         if (refreshToken != null && !refreshToken.isEmpty()) {
             refreshTokenRepository.deleteByTokenHashAndAccountId(sha256(refreshToken), accountId);
+        }
+    }
+
+    /** 바꾸면 이 기기만 남기고 다른 기기는 로그아웃된다 */
+    public void changePassword(Long accountId, String refreshToken, AuthDto.ChangePasswordRequest request) {
+        Account account = accountRepository.findById(accountId)
+            .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
+        if (!passwordMatches(request.currentPassword(), account.getPasswordHash())) {
+            throw new AppException(ErrorCode.PASSWORD_MISMATCH,
+                List.of(new ErrorResponse.FieldError("currentPassword", ErrorCode.PASSWORD_MISMATCH.getMessage())));
+        }
+
+        account.changePassword(passwordEncoder.encode(request.newPassword()));
+        if (refreshToken != null && !refreshToken.isEmpty()) {
+            refreshTokenRepository.deleteByAccountIdAndTokenHashNot(accountId, sha256(refreshToken));
+        } else {
+            refreshTokenRepository.deleteByAccountId(accountId);
         }
     }
 

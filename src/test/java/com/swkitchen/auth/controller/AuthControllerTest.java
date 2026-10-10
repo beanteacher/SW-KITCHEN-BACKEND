@@ -2,6 +2,7 @@ package com.swkitchen.auth.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -34,6 +35,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -209,7 +211,75 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.data.passwordChangeRecommended").value(true));
     }
 
-    private org.springframework.test.web.servlet.ResultActions login(String userId, String password) throws Exception {
+    @Test
+    @DisplayName("비밀번호 변경: 새 비밀번호로만 로그인되고, 이 기기는 남고 다른 기기는 로그아웃된다")
+    void changePassword() throws Exception {
+        Cookie otherRefresh = login("staff1", "pass1234").andReturn().getResponse().getCookie("refresh_token");
+        MvcResult me = login("staff1", "pass1234").andReturn();
+        Cookie access = me.getResponse().getCookie("access_token");
+        Cookie refresh = me.getResponse().getCookie("refresh_token");
+
+        changePassword("pass1234", "newpass", access, refresh)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        assertThat(refreshTokenRepository.findByTokenHash(sha256(refresh.getValue()))).isPresent();
+        assertThat(refreshTokenRepository.findByTokenHash(sha256(otherRefresh.getValue()))).isEmpty();
+        login("staff1", "pass1234").andExpect(status().isUnauthorized());
+        login("staff1", "newpass").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("현재 비밀번호가 틀리면 400 PASSWORD_MISMATCH, 비밀번호는 그대로")
+    void changePasswordWrongCurrent() throws Exception {
+        Cookie access = login("staff1", "pass1234").andReturn().getResponse().getCookie("access_token");
+
+        changePassword("wrong-pass", "newpass", access)
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("PASSWORD_MISMATCH"))
+            .andExpect(jsonPath("$.errors[0].field").value("currentPassword"))
+            .andExpect(jsonPath("$.errors[0].message").value("현재 비밀번호가 맞지 않습니다."));
+
+        login("staff1", "pass1234").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("새 비밀번호가 비었거나 72바이트를 넘으면 400 VALIDATION_ERROR")
+    void changePasswordInvalidNew() throws Exception {
+        Cookie access = login("staff1", "pass1234").andReturn().getResponse().getCookie("access_token");
+
+        changePassword("pass1234", "", access)
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+            .andExpect(jsonPath("$.errors[0].field").value("newPassword"));
+        changePassword("pass1234", "가".repeat(30), access)
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+            .andExpect(jsonPath("$.errors[0].field").value("newPassword"))
+            .andExpect(jsonPath("$.errors[0].message").value("비밀번호가 너무 깁니다. (영문 72자, 한글 24자 이하)"));
+
+        login("staff1", "pass1234").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("로그인 안 하고 비밀번호를 바꾸면 401 UNAUTHORIZED")
+    void changePasswordWithoutLogin() throws Exception {
+        changePassword("pass1234", "newpass")
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    private ResultActions changePassword(String current, String next, Cookie... cookies) throws Exception {
+        var request = patch("/api/v1/auth/password")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"currentPassword\":\"" + current + "\",\"newPassword\":\"" + next + "\"}");
+        if (cookies.length > 0) {
+            request.cookie(cookies);
+        }
+        return mvc.perform(request);
+    }
+
+    private ResultActions login(String userId, String password) throws Exception {
         return mvc.perform(post("/api/v1/auth/login")
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"userId\":\"" + userId + "\",\"password\":\"" + password + "\"}"));

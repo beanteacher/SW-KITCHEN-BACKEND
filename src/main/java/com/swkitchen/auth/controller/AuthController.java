@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,5 +47,15 @@ public class AuthController {
             .header(HttpHeaders.SET_COOKIE, authCookies.clearAccessToken().toString())
             .header(HttpHeaders.SET_COOKIE, authCookies.clearRefreshToken().toString())
             .body(ApiResponse.success(null));
+    }
+
+    @PatchMapping(value = "/password", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal Long accountId,
+            @CookieValue(name = REFRESH_TOKEN, required = false) String refreshToken,
+            @Valid @RequestBody AuthDto.ChangePasswordRequest request) {
+        authService.changePassword(accountId, refreshToken, request);
+
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

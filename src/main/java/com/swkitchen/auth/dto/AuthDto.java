@@ -2,6 +2,7 @@ package com.swkitchen.auth.dto;
 
 import com.swkitchen.auth.domain.Account;
 import com.swkitchen.auth.domain.Role;
+import com.swkitchen.common.validation.MaxBytes;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
@@ -14,6 +15,12 @@ public class AuthDto {
     public record LoginRequest(
             @NotBlank(message = "아이디를 입력해 주세요.") @Size(max = 20, message = "아이디는 20자 이하입니다.") String userId,
             @NotEmpty(message = "비밀번호를 입력해 주세요.") @Size(max = 72, message = "비밀번호는 72자 이하입니다.") String password) {
+    }
+
+    // 새 비밀번호 확인은 화면에서 한다
+    public record ChangePasswordRequest(
+            @NotEmpty(message = "현재 비밀번호를 입력해 주세요.") @Size(max = 72, message = "비밀번호는 72자 이하입니다.") String currentPassword,
+            @NotEmpty(message = "새 비밀번호를 입력해 주세요.") @MaxBytes(value = 72, message = "비밀번호가 너무 깁니다. (영문 72자, 한글 24자 이하)") String newPassword) {
     }
 
     // passwordChangeRecommended: 첫 관리자 비밀번호 그대로 로그인했으면 true. 화면이 변경 안내만 띄운다

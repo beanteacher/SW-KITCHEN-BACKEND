@@ -22,7 +22,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ErrorResponse> handleApp(AppException e) {
-        return toResponse(e.getErrorCode(), null);
+        return toResponse(e.getErrorCode(), e.getErrors());
     }
 
     /** {@code @Valid} 실패. {@code field} 는 요청 본문 경로 그대로 (예: {@code options[1].widthMm}) */
