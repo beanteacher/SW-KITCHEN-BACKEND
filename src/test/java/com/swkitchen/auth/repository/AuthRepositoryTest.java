@@ -3,7 +3,7 @@ package com.swkitchen.auth.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.swkitchen.TestcontainersConfig;
+import com.swkitchen.RepositoryTest;
 import com.swkitchen.auth.domain.Account;
 import com.swkitchen.auth.domain.RefreshToken;
 import com.swkitchen.auth.domain.Role;
@@ -11,15 +11,10 @@ import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(TestcontainersConfig.class)
+@RepositoryTest
 class AuthRepositoryTest {
 
     @Autowired

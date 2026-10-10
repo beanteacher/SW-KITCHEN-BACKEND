@@ -3,27 +3,18 @@ package com.swkitchen.category.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.swkitchen.TestcontainersConfig;
+import com.swkitchen.RepositoryTest;
 import com.swkitchen.category.domain.Category;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.jdbc.core.JdbcTemplate;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(TestcontainersConfig.class)
+@RepositoryTest
 class CategoryRepositoryTest {
 
     @Autowired
     CategoryRepository categoryRepository;
-
-    @Autowired
-    JdbcTemplate jdbc;
 
     @Test
     @DisplayName("대분류 아래에 중분류를 만든다")
@@ -68,8 +59,8 @@ class CategoryRepositoryTest {
     @Test
     @DisplayName("약어는 대문자 두 글자만 DB 가 받는다")
     void abbrCheck() {
-        assertThatThrownBy(() -> jdbc.update("INSERT INTO category (name, abbr, sort_order) VALUES ('냉장', 'rf', 1)"))
-            .hasMessageContaining("ck_category_abbr");
+        assertThatThrownBy(() -> categoryRepository.saveAndFlush(Category.create(null, "냉장", "rf", 1)))
+            .rootCause().hasMessageContaining("ck_category_abbr");
     }
 
     @Test
