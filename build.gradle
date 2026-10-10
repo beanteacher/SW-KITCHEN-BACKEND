@@ -30,6 +30,11 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
 
+    // QueryDSL — 원본(com.querydsl)은 관리가 끊겨 OpenFeign 이 이어 관리하는 판을 쓴다
+    implementation 'io.github.openfeign.querydsl:querydsl-jpa:7.7'
+    annotationProcessor 'io.github.openfeign.querydsl:querydsl-apt:7.7:jpa'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
     // DB
     runtimeOnly 'com.mysql:mysql-connector-j'
     implementation 'org.flywaydb:flyway-core'
