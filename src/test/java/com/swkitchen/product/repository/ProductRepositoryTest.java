@@ -6,9 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.swkitchen.RepositoryTest;
 import com.swkitchen.category.domain.Category;
 import com.swkitchen.category.repository.CategoryRepository;
+import com.swkitchen.product.domain.Material;
 import com.swkitchen.product.domain.Product;
 import com.swkitchen.product.domain.SalesType;
 import com.swkitchen.product.dto.ProductDto;
+import jakarta.persistence.EntityManager;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +30,9 @@ class ProductRepositoryTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    EntityManager em;
 
     Category fridge;
     Category freezer;
@@ -95,6 +100,36 @@ class ProductRepositoryTest {
             "INSERT INTO product (category_id, name, sales_type, manufacturer, origin, code_prefix, created_at, updated_at) "
                 + "VALUES (?, '냉장고', 'RENTAL', '제조사', '한국', 'RFUR-00001', NOW(6), NOW(6))", fridge.getId()))
             .hasMessageContaining("ck_product_sales_type");
+    }
+
+    @Test
+    @DisplayName("재질을 여러 개 저장하고 바꿀 수 있다. enum 의 모든 값을 DB 가 받는다")
+    void materials() {
+        Product product = product(fridge, "RFUR-00001");
+        product.changeMaterials(List.of(Material.values()));
+        productRepository.saveAndFlush(product);
+        em.clear();
+
+        assertThat(productRepository.findById(product.getId()).orElseThrow().getMaterials())
+            .containsExactlyInAnyOrder(Material.values());
+
+        Product saved = productRepository.findById(product.getId()).orElseThrow();
+        saved.changeMaterials(List.of(Material.STAINLESS));
+        productRepository.flush();
+        em.clear();
+
+        assertThat(productRepository.findById(product.getId()).orElseThrow().getMaterials())
+            .containsExactly(Material.STAINLESS);
+    }
+
+    @Test
+    @DisplayName("정해진 재질 외의 값은 DB 가 막는다")
+    void materialCheck() {
+        Product product = productRepository.saveAndFlush(product(fridge, "RFUR-00001"));
+
+        assertThatThrownBy(() -> jdbc.update(
+            "INSERT INTO product_material (product_id, material) VALUES (?, 'WOOD')", product.getId()))
+            .hasMessageContaining("ck_product_material");
     }
 
     private Product product(Category category, String codePrefix) {

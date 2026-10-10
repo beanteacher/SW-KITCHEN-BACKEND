@@ -1,13 +1,20 @@
 package com.swkitchen.product.domain;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -49,6 +56,12 @@ public class Product {
     @Column(nullable = false, columnDefinition = "tinyint")
     private int lastOptionNo;
 
+    @ElementCollection
+    @CollectionTable(name = "product_material", joinColumns = @JoinColumn(name = "product_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "material", nullable = false, length = 20)
+    private Set<Material> materials = new HashSet<>();
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -67,5 +80,14 @@ public class Product {
         product.origin = origin;
         product.codePrefix = codePrefix;
         return product;
+    }
+
+    public void changeMaterials(Collection<Material> materials) {
+        this.materials.clear();
+        this.materials.addAll(materials);
+    }
+
+    public Set<Material> getMaterials() {
+        return Collections.unmodifiableSet(materials);
     }
 }
