@@ -86,6 +86,11 @@ public class Product {
         return product;
     }
 
+    /** 지운 옵션의 번호는 다시 쓰지 않는다 */
+    public int nextOptionNo() {
+        return ++lastOptionNo;
+    }
+
     public void changeMaterials(Collection<Material> materials) {
         this.materials.clear();
         this.materials.addAll(materials);
