@@ -117,6 +117,17 @@ public class CategoryService {
         }
     }
 
+    /** 하위 분류나 제품이 있으면 지우지 않는다 */
+    public void delete(Long id) {
+        Category category = categoryRepository.findById(id)
+            .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+        if (categoryRepository.existsByParentId(id) || productRepository.existsByCategoryIdIn(List.of(id))) {
+            throw new AppException(ErrorCode.CATEGORY_IN_USE);
+        }
+
+        categoryRepository.delete(category);
+    }
+
     private boolean hasProducts(Category category) {
         List<Long> categoryIds = new ArrayList<>(List.of(category.getId()));
         if (category.isTop()) {

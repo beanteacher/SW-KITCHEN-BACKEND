@@ -1,6 +1,7 @@
 package com.swkitchen.category.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -213,6 +214,29 @@ class CategoryControllerTest {
         changeOrder("{\"categoryIds\":[]}")
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("삭제: 빈 분류는 지워져 트리에서 빠지고, 제품이 연결된 중분류는 409 와 이유를 준다")
+    void deleteCategory() throws Exception {
+        mvc.perform(delete("/api/v1/admin/category/" + kitchen.getId()).cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isOk());
+        mvc.perform(delete("/api/v1/admin/category/" + upright.getId()).cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("CATEGORY_IN_USE"))
+            .andExpect(jsonPath("$.message").value("하위 분류나 제품이 연결된 분류는 삭제할 수 없습니다."));
+
+        assertThat(categoryRepository.findById(kitchen.getId())).isEmpty();
+        assertThat(categoryRepository.findById(upright.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("삭제: 제품 관리 권한이 없으면 403 이고 지워지지 않는다")
+    void deleteNeedsPermission() throws Exception {
+        mvc.perform(delete("/api/v1/admin/category/" + kitchen.getId()).cookie(accessToken(Role.CUSTOMER)))
+            .andExpect(status().isForbidden());
+
+        assertThat(categoryRepository.findById(kitchen.getId())).isPresent();
     }
 
     private ResultActions changeOrder(String body) throws Exception {

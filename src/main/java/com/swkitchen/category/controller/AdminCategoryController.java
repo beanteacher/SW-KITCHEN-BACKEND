@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -51,6 +52,13 @@ public class AdminCategoryController {
     @PutMapping(value = "/order", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<Void>> changeOrder(@Valid @RequestBody CategoryDto.ChangeOrderRequest request) {
         categoryService.changeOrder(request);
+
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        categoryService.delete(id);
 
         return ResponseEntity.ok(ApiResponse.success(null));
     }

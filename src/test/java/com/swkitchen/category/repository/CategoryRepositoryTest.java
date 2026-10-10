@@ -84,4 +84,15 @@ class CategoryRepositoryTest {
         assertThat(categoryRepository.findTopByParentIdOrderBySortOrderDesc(top.getId())).get()
             .extracting(Category::getAbbr).isEqualTo("UR");
     }
+
+    @Test
+    @DisplayName("하위 분류가 있는지 본다")
+    void existsByParentId() {
+        Category top = categoryRepository.save(Category.create(null, "냉장·냉동", "RF", 1));
+        Category empty = categoryRepository.save(Category.create(null, "조리", "KT", 2));
+        categoryRepository.save(Category.create(top.getId(), "업소용 냉장고", "UR", 1));
+
+        assertThat(categoryRepository.existsByParentId(top.getId())).isTrue();
+        assertThat(categoryRepository.existsByParentId(empty.getId())).isFalse();
+    }
 }

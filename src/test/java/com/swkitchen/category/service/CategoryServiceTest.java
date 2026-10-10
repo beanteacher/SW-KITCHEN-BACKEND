@@ -232,6 +232,49 @@ class CategoryServiceTest {
         assertThat(kitchen.getSortOrder()).isEqualTo(2);
     }
 
+    // ── 삭제 ──
+
+    @Test
+    @DisplayName("삭제: 하위 분류도 제품도 없으면 지운다")
+    void delete() {
+        given(categoryRepository.findById(2L)).willReturn(Optional.of(kitchen));
+        given(categoryRepository.existsByParentId(2L)).willReturn(false);
+        given(productRepository.existsByCategoryIdIn(List.of(2L))).willReturn(false);
+
+        categoryService.delete(2L);
+
+        verify(categoryRepository).delete(kitchen);
+    }
+
+    @Test
+    @DisplayName("삭제: 중분류가 있는 대분류는 CATEGORY_IN_USE 로 막는다")
+    void deleteTopWithChildren() {
+        given(categoryRepository.findById(1L)).willReturn(Optional.of(fridge));
+        given(categoryRepository.existsByParentId(1L)).willReturn(true);
+
+        assertErrorCode(() -> categoryService.delete(1L), ErrorCode.CATEGORY_IN_USE);
+        verify(categoryRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("삭제: 제품이 연결된 중분류는 CATEGORY_IN_USE 로 막는다")
+    void deleteMiddleWithProducts() {
+        given(categoryRepository.findById(11L)).willReturn(Optional.of(upright));
+        given(categoryRepository.existsByParentId(11L)).willReturn(false);
+        given(productRepository.existsByCategoryIdIn(List.of(11L))).willReturn(true);
+
+        assertErrorCode(() -> categoryService.delete(11L), ErrorCode.CATEGORY_IN_USE);
+        verify(categoryRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("삭제: 없는 분류는 CATEGORY_NOT_FOUND")
+    void deleteNotFound() {
+        given(categoryRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertErrorCode(() -> categoryService.delete(999L), ErrorCode.CATEGORY_NOT_FOUND);
+    }
+
     private void assertErrorCode(Runnable call, ErrorCode errorCode) {
         assertThatThrownBy(call::run)
             .isInstanceOf(AppException.class)
