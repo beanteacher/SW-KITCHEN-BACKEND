@@ -33,7 +33,7 @@ public class AuthController {
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, authCookies.accessToken(result.accessToken()).toString())
             .header(HttpHeaders.SET_COOKIE, authCookies.refreshToken(result.refreshToken()).toString())
-            .body(ApiResponse.success(result.account()));
+            .body(ApiResponse.success(AuthDto.LoginResponse.from(result)));
     }
 
     @PostMapping("/logout")

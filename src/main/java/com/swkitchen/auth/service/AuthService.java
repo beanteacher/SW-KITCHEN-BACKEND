@@ -49,8 +49,9 @@ public class AuthService {
         refreshTokenRepository.save(RefreshToken.create(
             account.getId(), sha256(refreshToken), LocalDateTime.now().plus(properties.jwt().refreshTokenTtl())));
 
-        return new AuthDto.LoginResult(
-            AuthDto.LoginResponse.of(account, isInitialPassword(request.password())),
+        return AuthDto.LoginResult.of(
+            account,
+            isInitialPassword(request.password()),
             jwtProvider.createAccessToken(account.getId(), account.getRole()),
             refreshToken);
     }
