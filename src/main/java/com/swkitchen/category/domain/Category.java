@@ -47,6 +47,10 @@ public class Category {
         this.abbr = abbr;
     }
 
+    public void changeSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
     public boolean isTop() {
         return parentId == null;
     }

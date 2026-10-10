@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,5 +46,12 @@ public class AdminCategoryController {
         CategoryDto.Response category = categoryService.update(id, request);
 
         return ResponseEntity.ok(ApiResponse.success(category));
+    }
+
+    @PutMapping(value = "/order", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<Void>> changeOrder(@Valid @RequestBody CategoryDto.ChangeOrderRequest request) {
+        categoryService.changeOrder(request);
+
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

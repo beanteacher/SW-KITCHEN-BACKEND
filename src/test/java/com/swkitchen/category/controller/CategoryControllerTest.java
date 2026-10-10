@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -214,6 +215,50 @@ class CategoryControllerTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[?(@.field == 'name')]").exists())
             .andExpect(jsonPath("$.errors[?(@.field == 'abbr')]").exists());
+    }
+
+    @Test
+    @DisplayName("순서 변경: 대분류·중분류 모두 배열 순서대로 1부터 매기고 트리에 그 순서로 나온다")
+    void changeOrder() throws Exception {
+        changeOrder("{\"categoryIds\":[" + kitchen.getId() + "," + fridge.getId() + "]}")
+            .andExpect(status().isOk());
+        changeOrder("{\"parentId\":" + fridge.getId() + ",\"categoryIds\":[" + table.getId() + "," + upright.getId() + "]}")
+            .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/category"))
+            .andExpect(jsonPath("$.data[0].name").value("조리"))
+            .andExpect(jsonPath("$.data[0].sortOrder").value(1))
+            .andExpect(jsonPath("$.data[1].name").value("냉장·냉동"))
+            .andExpect(jsonPath("$.data[1].sortOrder").value(2))
+            .andExpect(jsonPath("$.data[1].children[0].name").value("테이블 냉장고"))
+            .andExpect(jsonPath("$.data[1].children[1].name").value("업소용 냉장고"));
+    }
+
+    @Test
+    @DisplayName("순서 변경: 형제 분류가 빠졌거나·다른 부모의 분류가 섞였거나·겹치면 400 이고 순서는 그대로")
+    void changeOrderMismatch() throws Exception {
+        String[] bodies = {
+            "{\"categoryIds\":[" + fridge.getId() + "]}",
+            "{\"categoryIds\":[" + fridge.getId() + "," + kitchen.getId() + "," + upright.getId() + "]}",
+            "{\"categoryIds\":[" + fridge.getId() + "," + fridge.getId() + "]}",
+            "{\"categoryIds\":[" + fridge.getId() + "," + upright.getId() + "]}",
+        };
+        for (String body : bodies) {
+            changeOrder(body)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CATEGORY_ORDER_MISMATCH"));
+        }
+        changeOrder("{\"categoryIds\":[]}")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        assertThat(categoryRepository.findById(fridge.getId()).orElseThrow().getSortOrder()).isEqualTo(1);
+        assertThat(categoryRepository.findById(kitchen.getId()).orElseThrow().getSortOrder()).isEqualTo(2);
+    }
+
+    private ResultActions changeOrder(String body) throws Exception {
+        return mvc.perform(put("/api/v1/admin/category/order").cookie(accessToken(Role.STAFF))
+            .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
     private ResultActions update(Category category, String body) throws Exception {

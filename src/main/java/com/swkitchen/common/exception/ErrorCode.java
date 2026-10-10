@@ -21,6 +21,8 @@ public enum ErrorCode {
     CATEGORY_NOT_MIDDLE(HttpStatus.BAD_REQUEST, "분류 단계가 맞지 않습니다."),
     CATEGORY_ABBR_DUPLICATE(HttpStatus.CONFLICT, "이미 쓰고 있는 약어입니다."),
     // 약어가 상품 코드 앞부분에 들어가므로 제품이 생긴 뒤에는 못 바꾼다
+    // 화면이 연 뒤 다른 사람이 분류를 더하거나 지웠을 때도 난다. 화면은 다시 불러온다
+    CATEGORY_ORDER_MISMATCH(HttpStatus.BAD_REQUEST, "분류 목록이 바뀌었습니다. 다시 불러와 주세요."),
     CATEGORY_ABBR_LOCKED(HttpStatus.CONFLICT, "제품이 연결된 분류는 약어를 바꿀 수 없습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 요청 형식입니다."),

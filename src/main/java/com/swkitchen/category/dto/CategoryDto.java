@@ -2,6 +2,7 @@ package com.swkitchen.category.dto;
 
 import com.swkitchen.category.domain.Category;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -23,6 +24,12 @@ public class CategoryDto {
     public record UpdateRequest(
             @Pattern(regexp = "(?s).*\\S.*", message = "분류 이름을 입력해 주세요.") @Size(max = 20, message = "분류 이름은 20자 이하입니다.") String name,
             @Pattern(regexp = "^[A-Z]{2}$", message = "약어는 영문 대문자 2자입니다.") String abbr) {
+    }
+
+    // categoryIds: 그 부모의 형제 분류 전체를 바꿀 순서대로
+    public record ChangeOrderRequest(
+            Long parentId,
+            @NotEmpty(message = "분류 목록을 보내 주세요.") List<@NotNull(message = "분류 id 가 비었습니다.") Long> categoryIds) {
     }
 
     public record Response(Long id, Long parentId, String name, String abbr, int sortOrder) {

@@ -9,8 +9,10 @@ import com.swkitchen.common.exception.ErrorCode;
 import com.swkitchen.product.dto.ProductDto;
 import com.swkitchen.product.repository.ProductRepository;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -99,6 +101,20 @@ public class CategoryService {
         }
 
         return CategoryDto.Response.from(category);
+    }
+
+    /** 배열 순서대로 1부터 매긴다. 배열은 형제 분류 전체와 같아야 한다 (빠짐·더함·중복 없이) */
+    public void changeOrder(CategoryDto.ChangeOrderRequest request) {
+        Map<Long, Category> siblings = categoryRepository.findByParentId(request.parentId()).stream()
+            .collect(Collectors.toMap(Category::getId, Function.identity()));
+        if (request.categoryIds().size() != siblings.size()
+                || !siblings.keySet().equals(new HashSet<>(request.categoryIds()))) {
+            throw new AppException(ErrorCode.CATEGORY_ORDER_MISMATCH);
+        }
+
+        for (int i = 0; i < request.categoryIds().size(); i++) {
+            siblings.get(request.categoryIds().get(i)).changeSortOrder(i + 1);
+        }
     }
 
     private boolean hasProducts(Category category) {
