@@ -2,9 +2,12 @@ package com.swkitchen.auth.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -20,8 +23,9 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private Long accountId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "account_id", nullable = false)
+    private Account account;
 
     @Column(nullable = false, length = 64, columnDefinition = "CHAR(64)")
     private String tokenHash;
@@ -33,9 +37,9 @@ public class RefreshToken {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public static RefreshToken create(Long accountId, String tokenHash, LocalDateTime expiresAt) {
+    public static RefreshToken create(Account account, String tokenHash, LocalDateTime expiresAt) {
         RefreshToken token = new RefreshToken();
-        token.accountId = accountId;
+        token.account = account;
         token.tokenHash = tokenHash;
         token.expiresAt = expiresAt;
         return token;

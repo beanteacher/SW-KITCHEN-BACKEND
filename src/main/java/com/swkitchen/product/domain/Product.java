@@ -1,15 +1,18 @@
 package com.swkitchen.product.domain;
 
+import com.swkitchen.category.domain.Category;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
@@ -31,8 +34,9 @@ public class Product {
     private Long id;
 
     // 중분류만 가리킨다
-    @Column(nullable = false)
-    private Long categoryId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 
     @Column(nullable = false, length = 200)
     private String name;
@@ -70,10 +74,10 @@ public class Product {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    public static Product create(Long categoryId, String name, SalesType salesType, String manufacturer, String origin,
+    public static Product create(Category category, String name, SalesType salesType, String manufacturer, String origin,
             String codePrefix) {
         Product product = new Product();
-        product.categoryId = categoryId;
+        product.category = category;
         product.name = name;
         product.salesType = salesType;
         product.manufacturer = manufacturer;

@@ -40,8 +40,8 @@ class ProductRepositoryTest {
     @BeforeEach
     void setUp() {
         Category top = categoryRepository.saveAndFlush(Category.create(null, "냉장·냉동", "RF", 1));
-        fridge = categoryRepository.saveAndFlush(Category.create(top.getId(), "업소용 냉장고", "UR", 1));
-        freezer = categoryRepository.saveAndFlush(Category.create(top.getId(), "업소용 냉동고", "UF", 2));
+        fridge = categoryRepository.saveAndFlush(Category.create(top, "업소용 냉장고", "UR", 1));
+        freezer = categoryRepository.saveAndFlush(Category.create(top, "업소용 냉동고", "UF", 2));
     }
 
     @Test
@@ -69,7 +69,7 @@ class ProductRepositoryTest {
     @DisplayName("없는 분류의 제품은 저장할 수 없다")
     void categoryMustExist() {
         assertThatThrownBy(() -> productRepository.saveAndFlush(
-            Product.create(999_999L, "냉장고", SalesType.NEW, "제조사", "한국", "RFUR-00001")))
+            Product.create(em.getReference(Category.class, 999_999L), "냉장고", SalesType.NEW, "제조사", "한국", "RFUR-00001")))
             .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -77,9 +77,10 @@ class ProductRepositoryTest {
     @DisplayName("제품이 연결된 분류는 DB 가 삭제를 막는다")
     void categoryInUseCannotBeDeleted() {
         productRepository.saveAndFlush(product(fridge, "RFUR-00001"));
+        em.clear();
 
         assertThatThrownBy(() -> {
-            categoryRepository.delete(fridge);
+            categoryRepository.deleteById(fridge.getId());
             categoryRepository.flush();
         }).isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -133,6 +134,6 @@ class ProductRepositoryTest {
     }
 
     private Product product(Category category, String codePrefix) {
-        return Product.create(category.getId(), "냉장고", SalesType.NEW, "제조사", "한국", codePrefix);
+        return Product.create(category, "냉장고", SalesType.NEW, "제조사", "한국", codePrefix);
     }
 }

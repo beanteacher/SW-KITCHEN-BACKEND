@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.swkitchen.RepositoryTest;
 import com.swkitchen.category.domain.Category;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,16 +15,19 @@ import org.springframework.dao.DataIntegrityViolationException;
 class CategoryRepositoryTest {
 
     @Autowired
+    EntityManager em;
+
+    @Autowired
     CategoryRepository categoryRepository;
 
     @Test
     @DisplayName("대분류 아래에 중분류를 만든다")
     void createChild() {
         Category top = categoryRepository.saveAndFlush(Category.create(null, "냉장·냉동", "RF", 1));
-        Category child = categoryRepository.saveAndFlush(Category.create(top.getId(), "업소용 냉장고", "UR", 1));
+        Category child = categoryRepository.saveAndFlush(Category.create(top, "업소용 냉장고", "UR", 1));
 
         assertThat(top.isTop()).isTrue();
-        assertThat(child.getParentId()).isEqualTo(top.getId());
+        assertThat(child.getParent().getId()).isEqualTo(top.getId());
     }
 
     @Test
@@ -39,9 +43,9 @@ class CategoryRepositoryTest {
     @DisplayName("같은 대분류 안 중분류끼리 약어가 겹치면 DB 가 막는다")
     void duplicateChildAbbr() {
         Category top = categoryRepository.saveAndFlush(Category.create(null, "냉장·냉동", "RF", 1));
-        categoryRepository.saveAndFlush(Category.create(top.getId(), "업소용 냉장고", "UR", 1));
+        categoryRepository.saveAndFlush(Category.create(top, "업소용 냉장고", "UR", 1));
 
-        assertThatThrownBy(() -> categoryRepository.saveAndFlush(Category.create(top.getId(), "업소용 냉동고", "UR", 2)))
+        assertThatThrownBy(() -> categoryRepository.saveAndFlush(Category.create(top, "업소용 냉동고", "UR", 2)))
             .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -50,9 +54,9 @@ class CategoryRepositoryTest {
     void sameAbbrUnderOtherParent() {
         Category fridge = categoryRepository.saveAndFlush(Category.create(null, "냉장·냉동", "RF", 1));
         Category table = categoryRepository.saveAndFlush(Category.create(null, "작업대·싱크", "WS", 2));
-        categoryRepository.saveAndFlush(Category.create(fridge.getId(), "업소용 냉장고", "UR", 1));
+        categoryRepository.saveAndFlush(Category.create(fridge, "업소용 냉장고", "UR", 1));
 
-        assertThat(categoryRepository.saveAndFlush(Category.create(table.getId(), "업소용 싱크", "UR", 1)).getId())
+        assertThat(categoryRepository.saveAndFlush(Category.create(table, "업소용 싱크", "UR", 1)).getId())
             .isNotNull();
     }
 
@@ -66,7 +70,7 @@ class CategoryRepositoryTest {
     @Test
     @DisplayName("없는 부모 아래에는 만들 수 없다")
     void parentMustExist() {
-        assertThatThrownBy(() -> categoryRepository.saveAndFlush(Category.create(999_999L, "업소용 냉장고", "UR", 1)))
+        assertThatThrownBy(() -> categoryRepository.saveAndFlush(Category.create(em.getReference(Category.class, 999_999L), "업소용 냉장고", "UR", 1)))
             .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -75,7 +79,7 @@ class CategoryRepositoryTest {
     void findByNullParent() {
         Category top = categoryRepository.save(Category.create(null, "냉장·냉동", "RF", 1));
         categoryRepository.save(Category.create(null, "조리", "KT", 2));
-        categoryRepository.save(Category.create(top.getId(), "업소용 냉장고", "UR", 5));
+        categoryRepository.save(Category.create(top, "업소용 냉장고", "UR", 5));
 
         assertThat(categoryRepository.existsByParentIdAndAbbr(null, "RF")).isTrue();
         assertThat(categoryRepository.existsByParentIdAndAbbr(null, "UR")).isFalse();
@@ -90,7 +94,7 @@ class CategoryRepositoryTest {
     void existsByParentId() {
         Category top = categoryRepository.save(Category.create(null, "냉장·냉동", "RF", 1));
         Category empty = categoryRepository.save(Category.create(null, "조리", "KT", 2));
-        categoryRepository.save(Category.create(top.getId(), "업소용 냉장고", "UR", 1));
+        categoryRepository.save(Category.create(top, "업소용 냉장고", "UR", 1));
 
         assertThat(categoryRepository.existsByParentId(top.getId())).isTrue();
         assertThat(categoryRepository.existsByParentId(empty.getId())).isFalse();

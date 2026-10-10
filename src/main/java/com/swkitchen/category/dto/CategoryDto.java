@@ -35,7 +35,8 @@ public class CategoryDto {
     public record Response(Long id, Long parentId, String name, String abbr, int sortOrder) {
 
         public static Response from(Category category) {
-            return new Response(category.getId(), category.getParentId(), category.getName(), category.getAbbr(),
+            Long parentId = category.isTop() ? null : category.getParent().getId();
+            return new Response(category.getId(), parentId, category.getName(), category.getAbbr(),
                 category.getSortOrder());
         }
     }

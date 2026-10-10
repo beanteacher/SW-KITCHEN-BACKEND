@@ -58,8 +58,8 @@ class CategoryControllerTest {
         // 저장 순서와 sortOrder 를 일부러 다르게 둔다
         kitchen = categoryRepository.save(Category.create(null, "조리", "KT", 2));
         fridge = categoryRepository.save(Category.create(null, "냉장·냉동", "RF", 1));
-        table = categoryRepository.save(Category.create(fridge.getId(), "테이블 냉장고", "TB", 2));
-        upright = categoryRepository.save(Category.create(fridge.getId(), "업소용 냉장고", "UR", 1));
+        table = categoryRepository.save(Category.create(fridge, "테이블 냉장고", "TB", 2));
+        upright = categoryRepository.save(Category.create(fridge, "업소용 냉장고", "UR", 1));
         productRepository.save(product(upright, "RFUR-00001"));
         productRepository.save(product(upright, "RFUR-00002"));
         productRepository.save(product(table, "RFTB-00001"));
@@ -259,6 +259,6 @@ class CategoryControllerTest {
     }
 
     private Product product(Category category, String code) {
-        return Product.create(category.getId(), "냉장고", SalesType.NEW, "제조사", "한국", code);
+        return Product.create(category, "냉장고", SalesType.NEW, "제조사", "한국", code);
     }
 }

@@ -49,7 +49,7 @@ public class AuthService {
 
         String refreshToken = newRefreshToken();
         refreshTokenRepository.save(RefreshToken.create(
-            account.getId(), sha256(refreshToken), LocalDateTime.now().plus(properties.jwt().refreshTokenTtl())));
+            account, sha256(refreshToken), LocalDateTime.now().plus(properties.jwt().refreshTokenTtl())));
 
         return AuthDto.LoginResult.of(
             account,

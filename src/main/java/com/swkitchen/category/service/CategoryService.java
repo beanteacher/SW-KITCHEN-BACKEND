@@ -56,8 +56,9 @@ public class CategoryService {
 
     /** 형제 분류 중 마지막 순서로 넣는다 */
     public CategoryDto.Response create(CategoryDto.CreateRequest request) {
+        Category parent = null;
         if (request.parentId() != null) {
-            Category parent = categoryRepository.findById(request.parentId())
+            parent = categoryRepository.findById(request.parentId())
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND,
                     List.of(new ErrorResponse.FieldError("parentId", ErrorCode.CATEGORY_NOT_FOUND.getMessage()))));
             if (!parent.isTop()) {
@@ -75,7 +76,7 @@ public class CategoryService {
             .map(last -> last.getSortOrder() + 1)
             .orElse(1);
         Category category = categoryRepository.save(
-            Category.create(request.parentId(), request.name(), request.abbr(), sortOrder));
+            Category.create(parent, request.name(), request.abbr(), sortOrder));
 
         return CategoryDto.Response.from(category);
     }
@@ -90,7 +91,8 @@ public class CategoryService {
                 throw new AppException(ErrorCode.CATEGORY_ABBR_LOCKED,
                     List.of(new ErrorResponse.FieldError("abbr", ErrorCode.CATEGORY_ABBR_LOCKED.getMessage())));
             }
-            if (categoryRepository.existsByParentIdAndAbbr(category.getParentId(), request.abbr())) {
+            Long parentId = category.isTop() ? null : category.getParent().getId();
+            if (categoryRepository.existsByParentIdAndAbbr(parentId, request.abbr())) {
                 throw new AppException(ErrorCode.CATEGORY_ABBR_DUPLICATE,
                     List.of(new ErrorResponse.FieldError("abbr", ErrorCode.CATEGORY_ABBR_DUPLICATE.getMessage())));
             }
@@ -143,7 +145,7 @@ public class CategoryService {
 
     private List<Category> childrenOf(List<Category> categories, Category parent) {
         return categories.stream()
-            .filter(category -> parent.getId().equals(category.getParentId()))
+            .filter(category -> !category.isTop() && parent.getId().equals(category.getParent().getId()))
             .toList();
     }
 }

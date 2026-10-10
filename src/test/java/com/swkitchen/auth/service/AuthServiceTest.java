@@ -79,7 +79,7 @@ class AuthServiceTest {
         verify(refreshTokenRepository).save(saved.capture());
         assertThat(result.accessToken()).isEqualTo("access");
         assertThat(result.passwordChangeRecommended()).isFalse();
-        assertThat(saved.getValue().getAccountId()).isEqualTo(1L);
+        assertThat(saved.getValue().getAccount().getId()).isEqualTo(1L);
         assertThat(saved.getValue().getTokenHash())
             .isEqualTo(AuthService.sha256(result.refreshToken()))
             .isNotEqualTo(result.refreshToken());

@@ -2,9 +2,12 @@ package com.swkitchen.category.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -19,7 +22,9 @@ public class Category {
     private Long id;
 
     // null 이면 대분류, 있으면 중분류
-    private Long parentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private Category parent;
 
     @Column(nullable = false, length = 50)
     private String name;
@@ -30,9 +35,9 @@ public class Category {
     @Column(nullable = false)
     private int sortOrder;
 
-    public static Category create(Long parentId, String name, String abbr, int sortOrder) {
+    public static Category create(Category parent, String name, String abbr, int sortOrder) {
         Category category = new Category();
-        category.parentId = parentId;
+        category.parent = parent;
         category.name = name;
         category.abbr = abbr;
         category.sortOrder = sortOrder;
@@ -52,6 +57,6 @@ public class Category {
     }
 
     public boolean isTop() {
-        return parentId == null;
+        return parent == null;
     }
 }

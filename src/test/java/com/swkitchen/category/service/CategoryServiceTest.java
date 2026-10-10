@@ -49,8 +49,8 @@ class CategoryServiceTest {
     void setUp() {
         fridge = category(1L, null, "냉장·냉동", "RF", 1);
         kitchen = category(2L, null, "조리", "KT", 2);
-        upright = category(11L, 1L, "업소용 냉장고", "UR", 1);
-        table = category(12L, 1L, "테이블 냉장고", "TB", 2);
+        upright = category(11L, fridge, "업소용 냉장고", "UR", 1);
+        table = category(12L, fridge, "테이블 냉장고", "TB", 2);
     }
 
     // ── 트리 ──
@@ -282,8 +282,8 @@ class CategoryServiceTest {
             .isEqualTo(errorCode);
     }
 
-    private Category category(Long id, Long parentId, String name, String abbr, int sortOrder) {
-        Category category = Category.create(parentId, name, abbr, sortOrder);
+    private Category category(Long id, Category parent, String name, String abbr, int sortOrder) {
+        Category category = Category.create(parent, name, abbr, sortOrder);
         ReflectionTestUtils.setField(category, "id", id);
         return category;
     }

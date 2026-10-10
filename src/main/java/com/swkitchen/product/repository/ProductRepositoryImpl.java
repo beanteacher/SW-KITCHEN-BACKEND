@@ -16,9 +16,9 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
     @Override
     public List<ProductDto.CategoryProductCount> countByCategory() {
         return queryFactory
-            .select(Projections.constructor(ProductDto.CategoryProductCount.class, product.categoryId, product.count()))
+            .select(Projections.constructor(ProductDto.CategoryProductCount.class, product.category.id, product.count()))
             .from(product)
-            .groupBy(product.categoryId)
+            .groupBy(product.category.id)
             .fetch();
     }
 }
