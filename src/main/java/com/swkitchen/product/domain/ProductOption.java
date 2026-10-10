@@ -100,6 +100,18 @@ public class ProductOption {
         return option;
     }
 
+    /** 상품 코드·잡아 둔 수량은 바꾸지 않는다 */
+    public void change(String modelName, int widthMm, int depthMm, int heightMm, int listPrice,
+            DiscountType discountType, Integer discountValue, Integer stockQty, String mainImageKey) {
+        this.modelName = modelName;
+        this.widthMm = widthMm;
+        this.depthMm = depthMm;
+        this.heightMm = heightMm;
+        changePrice(listPrice, discountType, discountValue);
+        this.stockQty = stockQty;
+        this.mainImageKey = mainImageKey;
+    }
+
     public void changePrice(int listPrice, DiscountType discountType, Integer discountValue) {
         this.listPrice = listPrice;
         this.discountType = discountType;

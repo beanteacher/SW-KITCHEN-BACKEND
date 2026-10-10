@@ -83,17 +83,13 @@ class ProductSaveRequestValidationTest {
     }
 
     @Test
-    @DisplayName("같은 치수의 옵션은 뒤에 나온 옵션에 오류가 난다")
-    void duplicateSize() {
-        assertThat(errors(request(SalesType.NEW, List.of(option(1200, null), option(1500, null), option(1200, null)),
-            List.of()))).containsOnlyKeys("options[2].widthMm");
-    }
+    @DisplayName("수정에서 기존 옵션을 가리키면 version 이 필요하다")
+    void versionForExistingOption() {
+        ProductDto.OptionRequest noVersion = new ProductDto.OptionRequest(7L, null, null, 1200, 600, 800, 10_000,
+            DiscountType.NONE, null, null, KEY, List.of());
 
-    @Test
-    @DisplayName("같은 이름의 사양은 뒤에 나온 줄에 오류가 난다")
-    void duplicateSpecName() {
-        assertThat(errors(request(SalesType.NEW, List.of(option(1200, null)), specs("소비전력", "용량", "소비전력 "))))
-            .containsOnlyKeys("specs[2].name");
+        assertThat(errors(request(SalesType.NEW, List.of(noVersion), List.of())))
+            .containsOnlyKeys("options[0].version");
     }
 
     // 응답의 field 와 같게 맞춘다. Spring 은 목록 원소 표시(.<list element>)를 빼고 경로를 만든다

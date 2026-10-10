@@ -3,6 +3,10 @@ package com.swkitchen.product.dto;
 import com.swkitchen.category.domain.Category;
 import com.swkitchen.product.domain.DiscountType;
 import com.swkitchen.product.domain.Material;
+import com.swkitchen.product.domain.OptionImage;
+import com.swkitchen.product.domain.Product;
+import com.swkitchen.product.domain.ProductDetailImage;
+import com.swkitchen.product.domain.ProductImage;
 import com.swkitchen.product.domain.ProductOption;
 import com.swkitchen.product.domain.ProductSpec;
 import com.swkitchen.product.domain.SalesType;
@@ -13,6 +17,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.util.Map;
+import java.util.function.UnaryOperator;
 import org.hibernate.validator.constraints.Range;
 
 public class ProductDto {
@@ -82,6 +88,50 @@ public class ProductDto {
             List<ImageResponse> images,
             List<ImageResponse> detailImages,
             List<AdminOptionResponse> options) {
+
+        /** 옵션 이미지는 옵션 id 별로 묶어 받는다. urlOf 는 이미지 키에 저장소 주소를 붙인다 */
+        public static AdminResponse of(
+                Product product,
+                List<ProductSpec> specs,
+                List<ProductImage> images,
+                List<ProductDetailImage> detailImages,
+                List<ProductOption> options,
+                Map<Long, List<OptionImage>> optionImages,
+                UnaryOperator<String> urlOf) {
+            List<MaterialResponse> materialResponses = product.getMaterials().stream()
+                .sorted()
+                .map(MaterialResponse::from)
+                .toList();
+            List<SpecResponse> specResponses = specs.stream()
+                .map(SpecResponse::from)
+                .toList();
+            List<ImageResponse> imageResponses = images.stream()
+                .map(image -> ImageResponse.of(image.getImageKey(), urlOf))
+                .toList();
+            List<ImageResponse> detailImageResponses = detailImages.stream()
+                .map(image -> ImageResponse.of(image.getImageKey(), urlOf))
+                .toList();
+            List<AdminOptionResponse> optionResponses = options.stream()
+                .map(option -> AdminOptionResponse.of(
+                    option,
+                    optionImages.getOrDefault(option.getId(), List.of()),
+                    urlOf))
+                .toList();
+
+            return new AdminResponse(
+                product.getId(),
+                product.getName(),
+                product.getSalesType(),
+                CategoryRef.from(product.getCategory()),
+                product.getManufacturer(),
+                product.getOrigin(),
+                materialResponses,
+                specResponses,
+                product.getDescription(),
+                imageResponses,
+                detailImageResponses,
+                optionResponses);
+        }
     }
 
     public record CategoryRef(Long id, String name, CategoryRef parent) {
@@ -109,6 +159,10 @@ public class ProductDto {
     }
 
     public record ImageResponse(String key, String url) {
+
+        public static ImageResponse of(String key, UnaryOperator<String> urlOf) {
+            return new ImageResponse(key, urlOf.apply(key));
+        }
     }
 
     public record AdminOptionResponse(
@@ -128,7 +182,14 @@ public class ProductDto {
             ImageResponse mainImage,
             List<ImageResponse> images) {
 
-        public static AdminOptionResponse of(ProductOption option, ImageResponse mainImage, List<ImageResponse> images) {
+        public static AdminOptionResponse of(
+                ProductOption option,
+                List<OptionImage> images,
+                UnaryOperator<String> urlOf) {
+            List<ImageResponse> imageResponses = images.stream()
+                .map(image -> ImageResponse.of(image.getImageKey(), urlOf))
+                .toList();
+
             return new AdminOptionResponse(
                 option.getId(),
                 option.getVersion(),
@@ -143,8 +204,8 @@ public class ProductDto {
                 option.getSalePrice(),
                 option.getStockQty(),
                 option.getReservedQty(),
-                mainImage,
-                images);
+                ImageResponse.of(option.getMainImageKey(), urlOf),
+                imageResponses);
         }
     }
 

@@ -3,6 +3,7 @@ package com.swkitchen.product.controller;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -108,7 +109,7 @@ class AdminProductControllerTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
             .andExpect(jsonPath("$.errors[*].field", containsInAnyOrder("name", "imageKeys[0]",
-                "options[1].discountValue", "options[1].stockQty", "options[1].widthMm")));
+                "options[1].discountValue", "options[1].stockQty")));
     }
 
     @Test
@@ -139,6 +140,44 @@ class AdminProductControllerTest {
     }
 
     @Test
+    @DisplayName("수정: 200 과 고친 전체 데이터를 주고, 낡은 version 은 409, 겹치는 치수는 400 이다")
+    void update() throws Exception {
+        String created = create("""
+            { "categoryId": %d, "name": "냉장고", "salesType": "STOCK", "manufacturer": "우성", "origin": "국산",
+              "options": [ { "widthMm": 1200, "depthMm": 600, "heightMm": 800, "listPrice": 10000,
+                             "discountType": "NONE", "stockQty": 1, "mainImageKey": "%s" } ] }
+            """.formatted(fridge.getId(), KEY1))
+            .andReturn().getResponse().getContentAsString();
+        int id = JsonPath.read(created, "$.data.id");
+        int optionId = JsonPath.read(created, "$.data.options[0].id");
+        String template = """
+            { "categoryId": %d, "name": "냉장고 2", "salesType": "STOCK", "manufacturer": "우성", "origin": "국산",
+              "options": [ { "id": %d, "version": %d, "widthMm": 1200, "depthMm": 600, "heightMm": 800,
+                             "listPrice": 20000, "discountType": "NONE", "stockQty": 2, "mainImageKey": "%s" },
+                           { "widthMm": %d, "depthMm": 600, "heightMm": 800, "listPrice": 10000,
+                             "discountType": "NONE", "stockQty": 1, "mainImageKey": "%s" } ] }
+            """;
+
+        update(id, template.formatted(fridge.getId(), optionId, 0, KEY1, 1200, KEY1))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("OPTION_SIZE_DUPLICATE"))
+            .andExpect(jsonPath("$.errors[0].field").value("options[1].widthMm"));
+
+        update(id, template.formatted(fridge.getId(), optionId, 0, KEY1, 1500, KEY1))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.name").value("냉장고 2"))
+            .andExpect(jsonPath("$.data.options[0].version").value(1))
+            .andExpect(jsonPath("$.data.options[0].listPrice").value(20000))
+            .andExpect(jsonPath("$.data.options[1].productCode").value("RFUR-00001-02"));
+
+        // 같은 화면에서 한 번 더 저장하면 version 이 낡았다
+        update(id, template.formatted(fridge.getId(), optionId, 0, KEY1, 1600, KEY1))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("CONCURRENT_MODIFICATION"))
+            .andExpect(jsonPath("$.errors[0].field").value("options[0].version"));
+    }
+
+    @Test
     @DisplayName("권한: 로그인 안 하면 401, 고객은 403, 관리자는 등록할 수 있다")
     void permission() throws Exception {
         String body = """
@@ -161,6 +200,11 @@ class AdminProductControllerTest {
 
     private ResultActions create(String body) throws Exception {
         return mvc.perform(post("/api/v1/admin/product").cookie(accessToken(Role.STAFF))
+            .contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    private ResultActions update(int id, String body) throws Exception {
+        return mvc.perform(put("/api/v1/admin/product/" + id).cookie(accessToken(Role.STAFF))
             .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 

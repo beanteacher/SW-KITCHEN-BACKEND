@@ -87,6 +87,17 @@ public class Product {
         return product;
     }
 
+    /** 상품 코드 앞자리는 분류를 바꿔도 그대로 둔다 */
+    public void change(Category category, String name, SalesType salesType, String manufacturer, String origin,
+            String description) {
+        this.category = category;
+        this.name = name;
+        this.salesType = salesType;
+        this.manufacturer = manufacturer;
+        this.origin = origin;
+        this.description = description;
+    }
+
     /** 지운 옵션의 번호는 다시 쓰지 않는다 */
     public int nextOptionNo() {
         return ++lastOptionNo;

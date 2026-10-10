@@ -9,13 +9,12 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * 제품 저장 요청에서 여러 칸을 함께 봐야 하는 검사. 오류는 칸 경로(예: {@code options[1].discountValue})로 붙인다.
- * 할인 값 범위, 재고품·중고품의 재고 필수, 옵션 치수 겹침, 사양 이름 겹침
+ * 할인 값 범위, 재고품·중고품의 재고 필수, 기존 옵션의 version 필수.
+ * 치수·사양 이름 겹침은 따로 오류 코드가 있어 서비스에서 본다
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
@@ -37,7 +36,6 @@ import java.util.Set;
 
             List<ProductDto.OptionRequest> options = request.options() == null ? List.of() : request.options();
             boolean countsStock = request.salesType() != null && request.salesType() != SalesType.NEW;
-            Set<List<Integer>> sizes = new HashSet<>();
             for (int i = 0; i < options.size(); i++) {
                 ProductDto.OptionRequest option = options.get(i);
                 if (option == null) {
@@ -50,19 +48,8 @@ import java.util.Set;
                 if (countsStock && option.stockQty() == null) {
                     valid = reject(context, "재고를 입력해 주세요.", "options", i, "stockQty");
                 }
-                // 치수 하나라도 비었으면 그 칸 오류로 충분하다
-                List<Integer> size = List.of(nz(option.widthMm()), nz(option.depthMm()), nz(option.heightMm()));
-                if (!size.contains(0) && !sizes.add(size)) {
-                    valid = reject(context, "같은 치수의 옵션이 있습니다.", "options", i, "widthMm");
-                }
-            }
-
-            List<ProductDto.SpecRequest> specs = request.specs() == null ? List.of() : request.specs();
-            Set<String> specNames = new HashSet<>();
-            for (int i = 0; i < specs.size(); i++) {
-                ProductDto.SpecRequest spec = specs.get(i);
-                if (spec != null && spec.name() != null && !specNames.add(spec.name().strip())) {
-                    valid = reject(context, "같은 이름의 사양이 있습니다.", "specs", i, "name");
+                if (option.id() != null && option.version() == null) {
+                    valid = reject(context, "옵션 version 을 보내 주세요.", "options", i, "version");
                 }
             }
             return valid;
@@ -80,10 +67,6 @@ import java.util.Set;
                 case AMOUNT -> value == null || value < 1 || option.listPrice() != null && value >= option.listPrice()
                     ? "할인 금액은 1원 이상, 정상가보다 작아야 합니다." : null;
             };
-        }
-
-        private static int nz(Integer value) {
-            return value == null ? 0 : value;
         }
 
         private static boolean reject(ConstraintValidatorContext context, String message, String list, int index,
