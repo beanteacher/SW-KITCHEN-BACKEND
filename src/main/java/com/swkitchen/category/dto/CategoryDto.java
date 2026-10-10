@@ -1,12 +1,31 @@
 package com.swkitchen.category.dto;
 
 import com.swkitchen.category.domain.Category;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
 
 public class CategoryDto {
 
     // ── API 요청·응답 (Request / Response) ──
+
+    // parentId 가 없으면 대분류
+    public record CreateRequest(
+            Long parentId,
+            @NotBlank(message = "분류 이름을 입력해 주세요.") @Size(max = 20, message = "분류 이름은 20자 이하입니다.") String name,
+            @NotNull(message = "약어를 입력해 주세요.") @Pattern(regexp = "^[A-Z]{2}$", message = "약어는 영문 대문자 2자입니다.") String abbr) {
+    }
+
+    public record Response(Long id, Long parentId, String name, String abbr, int sortOrder) {
+
+        public static Response from(Category category) {
+            return new Response(category.getId(), category.getParentId(), category.getName(), category.getAbbr(),
+                category.getSortOrder());
+        }
+    }
 
     // 대분류만 children 을 가진다. 중분류는 빈 배열
     public record TreeResponse(Long id, String name, String abbr, int sortOrder, List<TreeResponse> children) {

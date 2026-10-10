@@ -1,6 +1,8 @@
 package com.swkitchen.category.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -20,7 +22,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -92,6 +96,80 @@ class CategoryControllerTest {
         mvc.perform(get("/api/v1/admin/category").cookie(accessToken(Role.CUSTOMER)))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("분류 등록: 대분류는 대분류 중 마지막, 중분류는 형제 중 마지막 순서로 들어간다")
+    void create() throws Exception {
+        create("{\"name\":\"세척\",\"abbr\":\"WS\"}")
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.parentId").doesNotExist())
+            .andExpect(jsonPath("$.data.name").value("세척"))
+            .andExpect(jsonPath("$.data.abbr").value("WS"))
+            .andExpect(jsonPath("$.data.sortOrder").value(3));
+        create("{\"parentId\":" + fridge.getId() + ",\"name\":\"쇼케이스\",\"abbr\":\"SC\"}")
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.parentId").value(fridge.getId()))
+            .andExpect(jsonPath("$.data.sortOrder").value(3));
+        create("{\"parentId\":" + kitchen.getId() + ",\"name\":\"화구\",\"abbr\":\"BR\"}")
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.sortOrder").value(1));
+
+        assertThat(categoryRepository.count()).isEqualTo(7);
+    }
+
+    @Test
+    @DisplayName("분류 등록: 이름이 비었거나 20자 초과, 약어가 영문 대문자 2자가 아니면 400 과 칸별 오류")
+    void createValidation() throws Exception {
+        create("{\"name\":\" \",\"abbr\":\"ws\"}")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+            .andExpect(jsonPath("$.errors[?(@.field == 'name')]").exists())
+            .andExpect(jsonPath("$.errors[?(@.field == 'abbr')]").exists());
+        create("{\"name\":\"" + "가".repeat(21) + "\"}")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[?(@.field == 'name')]").exists())
+            .andExpect(jsonPath("$.errors[?(@.field == 'abbr')]").exists());
+    }
+
+    @Test
+    @DisplayName("분류 등록: 형제끼리 약어가 겹치면 409, 다른 대분류 아래면 같아도 된다")
+    void createDuplicateAbbr() throws Exception {
+        create("{\"name\":\"냉장\",\"abbr\":\"RF\"}")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("CATEGORY_ABBR_DUPLICATE"))
+            .andExpect(jsonPath("$.errors[0].field").value("abbr"));
+        create("{\"parentId\":" + fridge.getId() + ",\"name\":\"냉장고\",\"abbr\":\"UR\"}")
+            .andExpect(status().isConflict());
+        create("{\"parentId\":" + kitchen.getId() + ",\"name\":\"업소용 레인지\",\"abbr\":\"UR\"}")
+            .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("분류 등록: 없는 부모는 404, 중분류 아래에 만들면 400")
+    void createWrongParent() throws Exception {
+        create("{\"parentId\":999999,\"name\":\"세척\",\"abbr\":\"WS\"}")
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("CATEGORY_NOT_FOUND"));
+        create("{\"parentId\":" + upright.getId() + ",\"name\":\"세척\",\"abbr\":\"WS\"}")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("CATEGORY_NOT_MIDDLE"))
+            .andExpect(jsonPath("$.errors[0].field").value("parentId"));
+    }
+
+    @Test
+    @DisplayName("분류 등록: 제품 관리 권한이 없으면 403")
+    void createNeedsPermission() throws Exception {
+        mvc.perform(post("/api/v1/admin/category").cookie(accessToken(Role.CUSTOMER))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"세척\",\"abbr\":\"WS\"}"))
+            .andExpect(status().isForbidden());
+
+        assertThat(categoryRepository.count()).isEqualTo(4);
+    }
+
+    private ResultActions create(String body) throws Exception {
+        return mvc.perform(post("/api/v1/admin/category").cookie(accessToken(Role.STAFF))
+            .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
     private Cookie accessToken(Role role) {

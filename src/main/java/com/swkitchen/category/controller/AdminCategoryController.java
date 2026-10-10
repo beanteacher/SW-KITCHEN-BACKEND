@@ -3,10 +3,15 @@ package com.swkitchen.category.controller;
 import com.swkitchen.category.dto.CategoryDto;
 import com.swkitchen.category.service.CategoryService;
 import com.swkitchen.common.dto.ApiResponse;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -19,6 +24,15 @@ public class AdminCategoryController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<CategoryDto.AdminTreeResponse>>> getTree() {
-        return ResponseEntity.ok(ApiResponse.success(categoryService.getAdminTree()));
+        List<CategoryDto.AdminTreeResponse> tree = categoryService.getAdminTree();
+
+        return ResponseEntity.ok(ApiResponse.success(tree));
+    }
+
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<CategoryDto.Response>> create(@Valid @RequestBody CategoryDto.CreateRequest request) {
+        CategoryDto.Response category = categoryService.create(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(category));
     }
 }

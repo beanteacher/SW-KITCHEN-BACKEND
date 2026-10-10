@@ -19,6 +19,8 @@ public class CategoryController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<CategoryDto.TreeResponse>>> getTree() {
-        return ResponseEntity.ok(ApiResponse.success(categoryService.getTree()));
+        List<CategoryDto.TreeResponse> tree = categoryService.getTree();
+
+        return ResponseEntity.ok(ApiResponse.success(tree));
     }
 }

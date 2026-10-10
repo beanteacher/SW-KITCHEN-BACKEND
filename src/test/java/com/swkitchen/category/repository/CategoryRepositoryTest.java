@@ -69,4 +69,19 @@ class CategoryRepositoryTest {
         assertThatThrownBy(() -> categoryRepository.saveAndFlush(Category.create(999_999L, "업소용 냉장고", "UR", 1)))
             .isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    @DisplayName("부모가 null 이면 대분류끼리만 보고 약어 중복·마지막 순서를 찾는다")
+    void findByNullParent() {
+        Category top = categoryRepository.save(Category.create(null, "냉장·냉동", "RF", 1));
+        categoryRepository.save(Category.create(null, "조리", "KT", 2));
+        categoryRepository.save(Category.create(top.getId(), "업소용 냉장고", "UR", 5));
+
+        assertThat(categoryRepository.existsByParentIdAndAbbr(null, "RF")).isTrue();
+        assertThat(categoryRepository.existsByParentIdAndAbbr(null, "UR")).isFalse();
+        assertThat(categoryRepository.findTopByParentIdOrderBySortOrderDesc(null)).get()
+            .extracting(Category::getAbbr).isEqualTo("KT");
+        assertThat(categoryRepository.findTopByParentIdOrderBySortOrderDesc(top.getId())).get()
+            .extracting(Category::getAbbr).isEqualTo("UR");
+    }
 }
