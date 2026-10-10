@@ -43,7 +43,7 @@ class ProductOptionRepositoryTest {
         Category top = categoryRepository.saveAndFlush(Category.create(null, "작업대·싱크", "WS", 1));
         Category table = categoryRepository.saveAndFlush(Category.create(top, "작업대", "WT", 1));
         product = productRepository.saveAndFlush(
-            Product.create(table, "스텐 작업대", SalesType.USED, "대성", "국산", "WSWT-00015"));
+            Product.create(table, "스텐 작업대", SalesType.USED, "대성", "국산", "강직도 좋은 스텐 작업대", "WSWT-00015"));
     }
 
     @Test

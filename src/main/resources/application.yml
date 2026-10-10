@@ -24,6 +24,10 @@ security:
     STAFF: [PRODUCT_MANAGE]
     ADMIN: [PRODUCT_MANAGE]
 
+# 이미지 공개 주소 앞부분 (스토리지 또는 CDN). 뒤에 키를 붙인다
+image:
+  base-url: http://localhost:9000/sw-kitchen
+
 management:
   endpoints:
     web:

@@ -28,7 +28,7 @@ class ProductImageMappingTest {
     void saveAndRead() {
         Category top = Category.create(null, "냉장·냉동", "RF", 1);
         Category fridge = Category.create(top, "업소용 냉장고", "UR", 1);
-        Product product = Product.create(fridge, "냉장고", SalesType.NEW, "제조사", "한국", "RFUR-00001");
+        Product product = Product.create(fridge, "냉장고", SalesType.NEW, "제조사", "한국", "설명", "RFUR-00001");
         em.persist(top);
         em.persist(fridge);
         em.persist(product);

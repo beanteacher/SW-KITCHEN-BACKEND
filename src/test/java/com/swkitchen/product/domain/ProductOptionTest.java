@@ -36,7 +36,7 @@ class ProductOptionTest {
     @Test
     @DisplayName("옵션을 만들 때마다 번호를 하나씩 발급해 상품 코드를 붙인다")
     void productCode() {
-        Product product = Product.create(Category.create(null, "냉장·냉동", "RF", 1), "냉장고", SalesType.NEW, "제조사", "한국", "RFUR-00123");
+        Product product = Product.create(Category.create(null, "냉장·냉동", "RF", 1), "냉장고", SalesType.NEW, "제조사", "한국", "좋은 냉장고", "RFUR-00123");
 
         ProductOption first = option(product);
         ProductOption second = option(product);

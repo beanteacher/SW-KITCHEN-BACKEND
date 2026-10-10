@@ -36,7 +36,11 @@ public class CategoryDto {
 
         public static Response from(Category category) {
             Long parentId = category.isTop() ? null : category.getParent().getId();
-            return new Response(category.getId(), parentId, category.getName(), category.getAbbr(),
+            return new Response(
+                category.getId(),
+                parentId,
+                category.getName(),
+                category.getAbbr(),
                 category.getSortOrder());
         }
     }
@@ -45,7 +49,11 @@ public class CategoryDto {
     public record TreeResponse(Long id, String name, String abbr, int sortOrder, List<TreeResponse> children) {
 
         public static TreeResponse of(Category category, List<TreeResponse> children) {
-            return new TreeResponse(category.getId(), category.getName(), category.getAbbr(), category.getSortOrder(),
+            return new TreeResponse(
+                category.getId(),
+                category.getName(),
+                category.getAbbr(),
+                category.getSortOrder(),
                 children);
         }
     }
@@ -63,8 +71,13 @@ public class CategoryDto {
                 List<AdminTreeResponse> children) {
             long count = productCounts.getOrDefault(category.getId(), 0L)
                 + children.stream().mapToLong(AdminTreeResponse::productCount).sum();
-            return new AdminTreeResponse(category.getId(), category.getName(), category.getAbbr(),
-                category.getSortOrder(), count, children);
+            return new AdminTreeResponse(
+                category.getId(),
+                category.getName(),
+                category.getAbbr(),
+                category.getSortOrder(),
+                count,
+                children);
         }
     }
 }

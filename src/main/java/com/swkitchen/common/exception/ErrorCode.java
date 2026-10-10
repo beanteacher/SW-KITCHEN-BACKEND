@@ -25,6 +25,7 @@ public enum ErrorCode {
     CATEGORY_ORDER_MISMATCH(HttpStatus.BAD_REQUEST, "분류 목록이 바뀌었습니다. 다시 불러와 주세요."),
     CATEGORY_IN_USE(HttpStatus.CONFLICT, "하위 분류나 제품이 연결된 분류는 삭제할 수 없습니다."),
     CATEGORY_ABBR_LOCKED(HttpStatus.CONFLICT, "제품이 연결된 분류는 약어를 바꿀 수 없습니다."),
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "제품을 찾을 수 없습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 요청 형식입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");

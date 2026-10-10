@@ -69,7 +69,7 @@ class ProductRepositoryTest {
     @DisplayName("없는 분류의 제품은 저장할 수 없다")
     void categoryMustExist() {
         assertThatThrownBy(() -> productRepository.saveAndFlush(
-            Product.create(em.getReference(Category.class, 999_999L), "냉장고", SalesType.NEW, "제조사", "한국", "RFUR-00001")))
+            Product.create(em.getReference(Category.class, 999_999L), "냉장고", SalesType.NEW, "제조사", "한국", null, "RFUR-00001")))
             .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -134,6 +134,6 @@ class ProductRepositoryTest {
     }
 
     private Product product(Category category, String codePrefix) {
-        return Product.create(category, "냉장고", SalesType.NEW, "제조사", "한국", codePrefix);
+        return Product.create(category, "냉장고", SalesType.NEW, "제조사", "한국", null, codePrefix);
     }
 }

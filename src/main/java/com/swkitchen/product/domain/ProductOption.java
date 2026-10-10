@@ -103,7 +103,8 @@ public class ProductOption {
     public void changePrice(int listPrice, DiscountType discountType, Integer discountValue) {
         this.listPrice = listPrice;
         this.discountType = discountType;
-        this.discountValue = discountValue;
+        // 할인 없음이면 화면에 남아 있던 값을 버린다
+        this.discountValue = discountType == DiscountType.NONE ? null : discountValue;
         this.salePrice = salePrice(listPrice, discountType, discountValue);
     }
 

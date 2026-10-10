@@ -44,8 +44,13 @@ public class AuthDto {
 
         public static LoginResult of(Account account, boolean passwordChangeRecommended, String accessToken,
                 String refreshToken) {
-            return new LoginResult(account.getId(), account.getUserId(), account.getRole(), passwordChangeRecommended,
-                accessToken, refreshToken);
+            return new LoginResult(
+                account.getId(),
+                account.getUserId(),
+                account.getRole(),
+                passwordChangeRecommended,
+                accessToken,
+                refreshToken);
         }
     }
 }

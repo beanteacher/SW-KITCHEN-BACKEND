@@ -75,13 +75,14 @@ public class Product {
     private LocalDateTime updatedAt;
 
     public static Product create(Category category, String name, SalesType salesType, String manufacturer, String origin,
-            String codePrefix) {
+            String description, String codePrefix) {
         Product product = new Product();
         product.category = category;
         product.name = name;
         product.salesType = salesType;
         product.manufacturer = manufacturer;
         product.origin = origin;
+        product.description = description;
         product.codePrefix = codePrefix;
         return product;
     }
