@@ -5,6 +5,7 @@ import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -37,6 +38,12 @@ public class GlobalExceptionHandler {
         MissingServletRequestParameterException.class})
     public ResponseEntity<ErrorResponse> handleBadRequest(Exception e) {
         return toResponse(ErrorCode.VALIDATION_ERROR, null);
+    }
+
+    /** {@code @PreAuthorize} 실패. 로그인은 했지만 권한이 없다 */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
+        return toResponse(ErrorCode.FORBIDDEN, null);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

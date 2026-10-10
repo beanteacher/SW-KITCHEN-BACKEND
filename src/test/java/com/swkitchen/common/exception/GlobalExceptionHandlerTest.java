@@ -13,9 +13,11 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @WebMvcTest(GlobalExceptionHandlerTest.TestController.class)
 @Import(GlobalExceptionHandlerTest.TestController.class)
+@AutoConfigureMockMvc(addFilters = false) // 오류 형식만 본다. 인증은 AuthControllerTest
 class GlobalExceptionHandlerTest {
 
     @Autowired
@@ -75,6 +78,14 @@ class GlobalExceptionHandlerTest {
             .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
     }
 
+    @Test
+    @DisplayName("권한 검사 실패는 500 이 아니라 403 FORBIDDEN")
+    void accessDenied() throws Exception {
+        mvc.perform(post("/test/denied"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
     record Item(@NotBlank String name) {}
 
     record Body(@NotBlank String name, List<@Valid Item> items) {}
@@ -89,6 +100,11 @@ class GlobalExceptionHandlerTest {
         @PostMapping("/test/app")
         void app() {
             throw new AppException(ErrorCode.NOT_FOUND);
+        }
+
+        @PostMapping("/test/denied")
+        void denied() {
+            throw new AccessDeniedException("denied");
         }
 
         @PostMapping("/test/boom")

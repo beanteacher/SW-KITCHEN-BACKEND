@@ -1,6 +1,14 @@
-# 비밀번호가 git 에 남지 않도록 접속 정보는 서버 환경 변수로만 받는다. 값이 없으면 앱이 뜨지 않는다
+# 비밀값이 git 에 남지 않도록 서버 환경 변수로만 받는다. 값이 없으면 앱이 뜨지 않는다
 spring:
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+  # 계정이 하나도 없을 때만 만든다. 첫 배포 뒤에는 빼도 된다
+  initial-admin:
+    user-id: ${ADMIN_USER_ID:}
+    password: ${ADMIN_PASSWORD:}

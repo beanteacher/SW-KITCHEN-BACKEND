@@ -14,6 +14,16 @@ spring:
   jackson:
     time-zone: Asia/Seoul
 
+security:
+  jwt:
+    access-token-ttl: 30m
+    refresh-token-ttl: 14d
+  # API 는 역할이 아니라 권한을 검사한다. 역할을 바꿀 때는 여기만 고친다
+  role-permissions:
+    CUSTOMER: []
+    STAFF: [PRODUCT_MANAGE]
+    ADMIN: [PRODUCT_MANAGE]
+
 management:
   endpoints:
     web:
