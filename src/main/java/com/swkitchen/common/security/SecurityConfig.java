@@ -33,9 +33,10 @@ public class SecurityConfig {
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             // 공개 경로는 이 목록이 전부다. 나머지는 로그인이 필요하다
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.GET, "/api/v1/products/**", "/api/v1/categories/**", "/api/v1/materials").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/product/**", "/api/v1/category/**", "/api/v1/material").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
                 .requestMatchers("/actuator/health", "/error").permitAll()
+                .requestMatchers("/api/v1/admin/**").hasAuthority("PRODUCT_MANAGE")
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e.authenticationEntryPoint(errorHandler).accessDeniedHandler(errorHandler))
             .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, properties), UsernamePasswordAuthenticationFilter.class)

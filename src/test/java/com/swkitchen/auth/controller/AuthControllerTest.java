@@ -191,14 +191,14 @@ class AuthControllerTest {
     @DisplayName("공개 경로(제품 조회)는 로그인 없이 들어간다")
     void publicPath() throws Exception {
         // 아직 제품 API 가 없어 404 지만, 401 이 아니면 보안 단계는 통과한 것이다
-        mvc.perform(get("/api/v1/products"))
+        mvc.perform(get("/api/v1/product"))
             .andExpect(status().isNotFound());
     }
 
     @Test
     @DisplayName("공개 경로가 아닌 곳은 로그인 없이 401")
     void protectedPath() throws Exception {
-        mvc.perform(get("/api/v1/admin/products"))
+        mvc.perform(get("/api/v1/admin/product"))
             .andExpect(status().isUnauthorized());
     }
 
