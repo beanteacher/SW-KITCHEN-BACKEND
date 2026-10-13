@@ -24,6 +24,7 @@ import com.swkitchen.product.repository.ProductOptionRepository;
 import com.swkitchen.product.repository.ProductRepository;
 import com.swkitchen.product.repository.ProductSpecRepository;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -101,26 +102,53 @@ public class ProductService {
     public ProductDto.AdminResponse update(Long id, ProductDto.SaveRequest request) {
         Product product = productRepository.findById(id)
             .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
-        // 1. 검사: 중분류인지, 옵션 치수·사양 이름이 겹치지 않는지
         Category category = findMiddleCategory(request.categoryId());
         checkDuplicates(request);
 
-        // 2. 기존 옵션을 가리키는 요청(id 있음)을 하나씩 검사한다
-        //    - 이 제품의 옵션인지 (같은 id 를 두 번 보내도 거부)
-        //    - 화면을 연 뒤 다른 곳에서 고치지 않았는지 (version 비교)
-        //    - 재고를 잡아 둔 수량보다 적게 줄이지 않는지
         List<ProductOption> existing = productOptionRepository.findByProductIdOrderByOptionNo(id);
+        Map<Long, ProductOption> kept = checkKeptOptions(existing, request.options());
+        List<ProductOption> removed = checkRemovableOptions(existing, kept.keySet());
+        checkSalesTypeChange(product.getSalesType(), request.salesType(), existing);
+        checkOptionLimit(product, request.options());
+
+        // ── 여기부터 저장. 위 검사를 모두 통과해야 DB 를 건드린다 ──
+
+        // 상품 코드는 분류가 바뀌어도 그대로다
+        product.change(
+            category,
+            request.name(),
+            request.salesType(),
+            request.manufacturer(),
+            request.origin(),
+            request.description());
+        product.changeMaterials(request.materials() == null ? List.of() : request.materials());
+        deleteReplacedRows(id, existing, removed);
+        changeKeptOptions(kept, request);
+        createNewOptions(product, request);
+        saveSpecsAndImages(product, request);
+
+        return toAdminResponse(product);
+    }
+
+    /**
+     * 기존 옵션을 가리키는 요청(id 있음)을 하나씩 검사하고, 남길 옵션을 id 로 찾을 수 있게 돌려준다
+     * - 이 제품의 옵션인지 (같은 id 를 두 번 보내도 거부)
+     * - 화면을 연 뒤 다른 곳에서 고치지 않았는지 (version 비교)
+     * - 재고를 잡아 둔 수량보다 적게 줄이지 않는지
+     */
+    private static Map<Long, ProductOption> checkKeptOptions(
+            List<ProductOption> existing,
+            List<ProductDto.OptionRequest> requests) {
         Map<Long, ProductOption> existingById = existing.stream()
             .collect(Collectors.toMap(ProductOption::getId, Function.identity()));
-        List<ProductDto.OptionRequest> requests = request.options();
-        Set<Long> keptIds = new HashSet<>();
+        Map<Long, ProductOption> kept = new HashMap<>();
         for (int i = 0; i < requests.size(); i++) {
             ProductDto.OptionRequest req = requests.get(i);
             if (req.id() == null) {
                 continue;
             }
             ProductOption option = existingById.get(req.id());
-            if (option == null || !keptIds.add(req.id())) {
+            if (option == null || kept.put(req.id(), option) != null) {
                 throw fieldError(ErrorCode.OPTION_NOT_IN_PRODUCT, "options[%d].id".formatted(i));
             }
             if (option.getVersion() != req.version()) {
@@ -130,8 +158,11 @@ public class ProductService {
                 throw fieldError(ErrorCode.STOCK_BELOW_RESERVED, "options[%d].stockQty".formatted(i));
             }
         }
+        return kept;
+    }
 
-        // 3. 요청에 없는 기존 옵션 = 지울 옵션. 잡아 둔 수량이 있으면 지울 수 없다
+    /** 요청에 없는 기존 옵션 = 지울 옵션. 잡아 둔 수량이 있으면 지울 수 없다 */
+    private static List<ProductOption> checkRemovableOptions(List<ProductOption> existing, Set<Long> keptIds) {
         List<ProductOption> removed = existing.stream()
             .filter(option -> !keptIds.contains(option.getId()))
             .toList();
@@ -139,40 +170,37 @@ public class ProductService {
         if (removed.stream().anyMatch(option -> option.getReservedQty() > 0)) {
             throw new AppException(ErrorCode.OPTION_IN_USE);
         }
-        // 4. 판매 구분을 바꿔도 되는지, 새 옵션 번호가 99번을 넘지 않는지 (지운 번호도 센다)
-        checkSalesTypeChange(product.getSalesType(), request.salesType(), existing);
+        return removed;
+    }
+
+    /** 새 옵션 번호가 99번을 넘지 않는지 본다. 지운 번호는 다시 쓰지 않아 지운 것도 센다 */
+    private static void checkOptionLimit(Product product, List<ProductDto.OptionRequest> requests) {
         long newCount = requests.stream().filter(req -> req.id() == null).count();
         if (product.getLastOptionNo() + newCount > MAX_OPTION_NO) {
             throw new AppException(ErrorCode.OPTION_LIMIT_EXCEEDED);
         }
+    }
 
-        // ── 여기부터 저장. 위 검사를 모두 통과해야 DB 를 건드린다 ──
-
-        // 5. 제품 본체와 재질을 고친다. 상품 코드는 분류가 바뀌어도 그대로다
-        product.change(
-            category,
-            request.name(),
-            request.salesType(),
-            request.manufacturer(),
-            request.origin(),
-            request.description());
-        product.changeMaterials(request.materials() == null ? List.of() : request.materials());
-
-        // 6. 옵션 이미지·사양·제품 이미지는 통째로 지우고 아래에서 다시 넣는다. 빠진 옵션도 여기서 지운다
-        //    새로 넣는 행과 지울 행이 같은 치수·이름일 수 있어 지우기는 바로 실행한다
+    /**
+     * 옵션 이미지·사양·제품 이미지는 통째로 지우고 뒤에서 다시 넣는다. 빠진 옵션도 여기서 지운다.
+     * 새로 넣는 행과 지울 행이 같은 치수·이름일 수 있어 지우기는 바로 실행한다
+     */
+    private void deleteReplacedRows(Long productId, List<ProductOption> existing, List<ProductOption> removed) {
         List<Long> existingIds = existing.stream().map(ProductOption::getId).toList();
         optionImageRepository.deleteAllInBatch(optionImageRepository.findByProductOptionIdInOrderBySortOrder(existingIds));
         productOptionRepository.deleteAllInBatch(removed);
-        productSpecRepository.deleteAllInBatch(productSpecRepository.findByProductIdOrderBySortOrder(id));
-        productImageRepository.deleteAllInBatch(productImageRepository.findByProductIdOrderBySortOrder(id));
-        productDetailImageRepository.deleteAllInBatch(productDetailImageRepository.findByProductIdOrderBySortOrder(id));
+        productSpecRepository.deleteAllInBatch(productSpecRepository.findByProductIdOrderBySortOrder(productId));
+        productImageRepository.deleteAllInBatch(productImageRepository.findByProductIdOrderBySortOrder(productId));
+        productDetailImageRepository.deleteAllInBatch(productDetailImageRepository.findByProductIdOrderBySortOrder(productId));
+    }
 
-        // 7. 남은 기존 옵션을 고치고 그 이미지를 다시 넣는다
-        for (ProductDto.OptionRequest req : requests) {
+    /** 남은 기존 옵션을 고치고 그 이미지를 다시 넣는다 */
+    private void changeKeptOptions(Map<Long, ProductOption> kept, ProductDto.SaveRequest request) {
+        for (ProductDto.OptionRequest req : request.options()) {
             if (req.id() == null) {
                 continue;
             }
-            ProductOption option = existingById.get(req.id());
+            ProductOption option = kept.get(req.id());
             option.change(
                 req.modelName(),
                 req.toDimensions(),
@@ -184,15 +212,15 @@ public class ProductService {
         // 고친 옵션의 원래 치수로 새 옵션을 넣을 수 있게 고친 내용을 먼저 반영한다
         // ponytail: 기존 옵션 둘의 치수를 맞바꾸면 반영 도중 치수 겹침으로 500 이 난다. 필요해지면 임시 치수를 거쳐 바꾼다
         productOptionRepository.flush();
-        // 8. 새 옵션(id 없음)을 다음 번호로 만들고, 사양·제품 이미지를 다시 넣는다
-        for (ProductDto.OptionRequest req : requests) {
+    }
+
+    /** 새 옵션(id 없음)을 다음 번호로 만든다 */
+    private void createNewOptions(Product product, ProductDto.SaveRequest request) {
+        for (ProductDto.OptionRequest req : request.options()) {
             if (req.id() == null) {
                 createOption(product, request.salesType(), req);
             }
         }
-        saveSpecsAndImages(product, request);
-
-        return toAdminResponse(product);
     }
 
     /** 저장된 사양·이미지·옵션을 다시 읽어 화면용 응답으로 넘긴다. 응답 모양은 DTO 가 만든다 */
@@ -268,14 +296,17 @@ public class ProductService {
 
     /** 신제품↔재고품만 오간다. 재고품을 신제품으로 바꿀 때는 잡아 둔 수량이 없어야 한다. 중고품은 오가지 않는다 */
     private static void checkSalesTypeChange(SalesType from, SalesType to, List<ProductOption> options) {
-        if (from == to || from == SalesType.NEW && to == SalesType.STOCK) {
+        if (from == to) {
             return;
         }
-        boolean stockToNew = from == SalesType.STOCK && to == SalesType.NEW
-            && options.stream().allMatch(option -> option.getReservedQty() == 0);
-        if (!stockToNew) {
-            throw fieldError(ErrorCode.SALES_TYPE_CHANGE_NOT_ALLOWED, "salesType");
+        if (from == SalesType.NEW && to == SalesType.STOCK) {
+            return;
         }
+        if (from == SalesType.STOCK && to == SalesType.NEW
+            && options.stream().allMatch(option -> option.getReservedQty() == 0)) {
+            return;
+        }
+        throw fieldError(ErrorCode.SALES_TYPE_CHANGE_NOT_ALLOWED, "salesType");
     }
 
     /** 화면이 어느 칸에 오류를 띄울지 알 수 있게 칸 경로를 붙인 예외를 만든다 */

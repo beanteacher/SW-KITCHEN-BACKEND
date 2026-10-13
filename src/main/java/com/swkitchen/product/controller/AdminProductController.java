@@ -31,8 +31,7 @@ public class AdminProductController {
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ApiResponse<ProductDto.AdminResponse>> create(
-            @Valid @RequestBody ProductDto.SaveRequest request) {
+    public ResponseEntity<ApiResponse<ProductDto.AdminResponse>> create(@Valid @RequestBody ProductDto.SaveRequest request) {
         ProductDto.AdminResponse product = productService.create(request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(product));
