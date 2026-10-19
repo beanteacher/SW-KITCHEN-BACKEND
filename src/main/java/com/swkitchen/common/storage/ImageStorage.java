@@ -16,12 +16,12 @@ public class ImageStorage {
     private final StorageProperties properties;
 
     /** 올린 파일의 키(예: products/{UUID}.jpg)를 돌려준다 */
-    public String upload(byte[] content, String extension, String contentType) {
-        String key = "products/" + UUID.randomUUID() + "." + extension;
+    public String upload(byte[] content, ImageType type) {
+        String key = "products/" + UUID.randomUUID() + "." + type.getExtension();
         PutObjectRequest request = PutObjectRequest.builder()
             .bucket(properties.bucket())
             .key(key)
-            .contentType(contentType)
+            .contentType(type.getContentType())
             .build();
         s3Client.putObject(request, RequestBody.fromBytes(content));
         return key;

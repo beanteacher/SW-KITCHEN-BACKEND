@@ -14,6 +14,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** 모든 실패 응답을 여기서 만든다. */
@@ -60,6 +61,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException e) {
         return toResponse(ErrorCode.UNSUPPORTED_MEDIA_TYPE, null);
+    }
+
+    /** 업로드 크기 초과. 한도는 application.yml 의 multipart 설정이다 */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadTooLarge(MaxUploadSizeExceededException e) {
+        return toResponse(ErrorCode.IMAGE_TOO_LARGE, null);
     }
 
     /** 같은 행을 다른 트랜잭션이 먼저 바꿨다 */

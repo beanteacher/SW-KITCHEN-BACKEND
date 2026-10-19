@@ -36,6 +36,9 @@ public enum ErrorCode {
     SALES_TYPE_CHANGE_NOT_ALLOWED(HttpStatus.CONFLICT, "판매 구분을 이렇게 바꿀 수 없습니다."),
     // 불러온 뒤 다른 담당자나 주문이 옵션을 바꿨다. 화면은 다시 불러온다
     CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "다른 곳에서 먼저 수정했습니다. 다시 불러와 주세요."),
+    // 확장자가 아니라 파일 앞부분으로 형식을 본다
+    IMAGE_INVALID_TYPE(HttpStatus.BAD_REQUEST, "JPG·PNG·WEBP 이미지만 올릴 수 있습니다."),
+    IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "이미지는 10MB 까지 올릴 수 있습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 요청 형식입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");

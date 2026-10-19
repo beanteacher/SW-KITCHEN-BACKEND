@@ -27,7 +27,7 @@ class ImageStorageTest {
     void upload() {
         byte[] content = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 1, 2, 3};
 
-        String key = imageStorage.upload(content, "jpg", "image/jpeg");
+        String key = imageStorage.upload(content, ImageType.JPG);
 
         assertThat(key).matches("products/[0-9a-f-]{36}\\.jpg");
         ResponseBytes<GetObjectResponse> saved = s3Client.getObjectAsBytes(request -> request
