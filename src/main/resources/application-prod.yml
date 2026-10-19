@@ -15,3 +15,5 @@ security:
 
 image:
   base-url: ${IMAGE_BASE_URL}
+storage:
+  bucket: ${S3_BUCKET}

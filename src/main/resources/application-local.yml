@@ -14,3 +14,6 @@ security:
     password: "1234"   # 이 비밀번호로 로그인하면 변경 안내가 뜬다
 image:
   base-url: http://localhost:4566/sw-kitchen   # docker compose 의 LocalStack
+storage:
+  bucket: sw-kitchen
+  endpoint: http://localhost:4566
