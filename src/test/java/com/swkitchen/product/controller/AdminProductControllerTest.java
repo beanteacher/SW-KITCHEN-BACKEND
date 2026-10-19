@@ -75,7 +75,7 @@ class AdminProductControllerTest {
             .andExpect(jsonPath("$.data.materials[?(@.code == 'STAINLESS')].name").value("스테인리스"))
             .andExpect(jsonPath("$.data.specs[0].name").value("냉동 구성"))
             .andExpect(jsonPath("$.data.images[0].key").value(KEY1))
-            .andExpect(jsonPath("$.data.images[0].url").value("http://localhost:9000/sw-kitchen/" + KEY1))
+            .andExpect(jsonPath("$.data.images[0].url").value("http://localhost:4566/sw-kitchen/" + KEY1))
             .andExpect(jsonPath("$.data.options[0].productCode").value("RFUR-00001-01"))
             .andExpect(jsonPath("$.data.options[0].modelName").value("WSM-1243RF"))
             .andExpect(jsonPath("$.data.options[0].salePrice").value(1_660_000))
