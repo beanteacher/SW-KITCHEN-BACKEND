@@ -8,6 +8,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,6 +31,11 @@ public class Category {
     @JoinColumn(name = "parent_id")
     private Category parent;
 
+    // 읽기용. 저장·삭제는 CategoryRepository 로 한다
+    @OneToMany(mappedBy = "parent")
+    @OrderBy("sortOrder ASC, id ASC")
+    private List<Category> children = new ArrayList<>();
+
     @Column(nullable = false, length = 50)
     private String name;
 
@@ -41,6 +51,9 @@ public class Category {
         category.name = name;
         category.abbr = abbr;
         category.sortOrder = sortOrder;
+        if (parent != null) {
+            parent.addChild(category);
+        }
         return category;
     }
 
@@ -54,6 +67,18 @@ public class Category {
 
     public void changeSortOrder(int sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    public List<Category> getChildren() {
+        return Collections.unmodifiableList(children);
+    }
+
+    void addChild(Category child) {
+        children.add(child);
+    }
+
+    public void removeChild(Category child) {
+        children.remove(child);
     }
 
     public boolean isTop() {

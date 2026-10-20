@@ -17,6 +17,7 @@ import com.swkitchen.common.security.JwtProvider;
 import com.swkitchen.product.domain.Product;
 import com.swkitchen.product.domain.SalesType;
 import com.swkitchen.product.repository.ProductRepository;
+import jakarta.persistence.EntityManager;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,6 +49,9 @@ class CategoryControllerTest {
     @Autowired
     JwtProvider jwtProvider;
 
+    @Autowired
+    EntityManager em;
+
     Category fridge;
     Category kitchen;
     Category upright;
@@ -63,6 +67,9 @@ class CategoryControllerTest {
         productRepository.save(product(upright, "RFUR-00001"));
         productRepository.save(product(upright, "RFUR-00002"));
         productRepository.save(product(table, "RFTB-00001"));
+        // 요청마다 새로 읽는 실제 상황처럼, 하위 목록을 DB 순서대로 다시 읽게 비운다
+        em.flush();
+        em.clear();
     }
 
     @Test

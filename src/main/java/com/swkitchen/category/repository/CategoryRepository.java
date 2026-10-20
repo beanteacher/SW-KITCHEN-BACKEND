@@ -14,5 +14,7 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
     List<Category> findByParentId(Long parentId);
 
+    List<Category> findByParentIsNullOrderBySortOrderAscIdAsc();
+
     boolean existsByParentId(Long parentId);
 }

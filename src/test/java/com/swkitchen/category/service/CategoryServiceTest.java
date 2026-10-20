@@ -25,7 +25,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,7 +57,7 @@ class CategoryServiceTest {
     @Test
     @DisplayName("관리용 트리: 중분류는 자기 제품 수, 대분류는 아래 중분류 합, 제품이 없으면 0")
     void adminTreeProductCount() {
-        given(categoryRepository.findAll(any(Sort.class))).willReturn(List.of(fridge, upright, table, kitchen));
+        given(categoryRepository.findByParentIsNullOrderBySortOrderAscIdAsc()).willReturn(List.of(fridge, kitchen));
         given(productRepository.countByCategory()).willReturn(List.of(
             new ProductDto.CategoryProductCount(11L, 2), new ProductDto.CategoryProductCount(12L, 1)));
 
@@ -244,6 +243,19 @@ class CategoryServiceTest {
         categoryService.delete(2L);
 
         verify(categoryRepository).delete(kitchen);
+    }
+
+    @Test
+    @DisplayName("삭제: 중분류를 지우면 대분류의 하위 목록에서도 빠진다")
+    void deleteMiddle() {
+        given(categoryRepository.findById(12L)).willReturn(Optional.of(table));
+        given(categoryRepository.existsByParentId(12L)).willReturn(false);
+        given(productRepository.existsByCategoryIdIn(List.of(12L))).willReturn(false);
+
+        categoryService.delete(12L);
+
+        verify(categoryRepository).delete(table);
+        assertThat(fridge.getChildren()).containsExactly(upright);
     }
 
     @Test

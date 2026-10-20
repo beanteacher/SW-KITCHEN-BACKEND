@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.swkitchen.RepositoryTest;
 import com.swkitchen.category.domain.Category;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -98,5 +99,22 @@ class CategoryRepositoryTest {
 
         assertThat(categoryRepository.existsByParentId(top.getId())).isTrue();
         assertThat(categoryRepository.existsByParentId(empty.getId())).isFalse();
+    }
+
+    @Test
+    @DisplayName("대분류만 순서대로 읽고, 중분류는 대분류마다 순서대로 붙는다")
+    void topsWithChildren() {
+        Category kitchen = categoryRepository.save(Category.create(null, "조리", "KT", 2));
+        Category fridge = categoryRepository.save(Category.create(null, "냉장·냉동", "RF", 1));
+        categoryRepository.save(Category.create(fridge, "테이블 냉장고", "TB", 2));
+        categoryRepository.save(Category.create(fridge, "업소용 냉장고", "UR", 1));
+        em.flush();
+        em.clear();
+
+        List<Category> parents = categoryRepository.findByParentIsNullOrderBySortOrderAscIdAsc();
+
+        assertThat(parents).extracting(Category::getAbbr).containsExactly("RF", "KT");
+        assertThat(parents.get(0).getChildren()).extracting(Category::getAbbr).containsExactly("UR", "TB");
+        assertThat(parents.get(1).getChildren()).isEmpty();
     }
 }

@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,11 +28,10 @@ public class CategoryService {
 
     @Transactional(readOnly = true)
     public List<CategoryDto.TreeResponse> getTree() {
-        List<Category> categories = findAllSorted();
+        List<Category> parents = categoryRepository.findByParentIsNullOrderBySortOrderAscIdAsc();
 
-        return categories.stream()
-            .filter(Category::isTop)
-            .map(top -> CategoryDto.TreeResponse.of(top, childrenOf(categories, top).stream()
+        return parents.stream()
+            .map(parent -> CategoryDto.TreeResponse.of(parent, parent.getChildren().stream()
                 .map(child -> CategoryDto.TreeResponse.of(child, List.of()))
                 .toList()))
             .toList();
@@ -41,14 +39,13 @@ public class CategoryService {
 
     @Transactional(readOnly = true)
     public List<CategoryDto.AdminTreeResponse> getAdminTree() {
-        List<Category> categories = findAllSorted();
+        List<Category> parents = categoryRepository.findByParentIsNullOrderBySortOrderAscIdAsc();
         Map<Long, Long> productCounts = productRepository.countByCategory().stream()
             .collect(Collectors.toMap(ProductDto.CategoryProductCount::categoryId,
                 ProductDto.CategoryProductCount::productCount));
 
-        return categories.stream()
-            .filter(Category::isTop)
-            .map(top -> CategoryDto.AdminTreeResponse.of(top, productCounts, childrenOf(categories, top).stream()
+        return parents.stream()
+            .map(parent -> CategoryDto.AdminTreeResponse.of(parent, productCounts, parent.getChildren().stream()
                 .map(child -> CategoryDto.AdminTreeResponse.of(child, productCounts, List.of()))
                 .toList()))
             .toList();
@@ -127,6 +124,9 @@ public class CategoryService {
             throw new AppException(ErrorCode.CATEGORY_IN_USE);
         }
 
+        if (!category.isTop()) {
+            category.getParent().removeChild(category);
+        }
         categoryRepository.delete(category);
     }
 
@@ -136,16 +136,5 @@ public class CategoryService {
             categoryRepository.findByParentId(category.getId()).forEach(child -> categoryIds.add(child.getId()));
         }
         return productRepository.existsByCategoryIdIn(categoryIds);
-    }
-
-    // 분류는 수십 개라 한 번에 읽어 메모리에서 트리로 묶는다
-    private List<Category> findAllSorted() {
-        return categoryRepository.findAll(Sort.by("sortOrder", "id"));
-    }
-
-    private List<Category> childrenOf(List<Category> categories, Category parent) {
-        return categories.stream()
-            .filter(category -> !category.isTop() && parent.getId().equals(category.getParent().getId()))
-            .toList();
     }
 }
