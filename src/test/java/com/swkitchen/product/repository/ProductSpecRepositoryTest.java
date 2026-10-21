@@ -34,7 +34,7 @@ class ProductSpecRepositoryTest {
         Category top = categoryRepository.saveAndFlush(Category.create(null, "가열기기", "HT", 1));
         Category fryer = categoryRepository.saveAndFlush(Category.create(top, "튀김기", "FR", 1));
         product = productRepository.saveAndFlush(
-            Product.create(fryer, "전기 튀김기", SalesType.NEW, "제조사", "한국", "HTFR-00001"));
+            Product.create(fryer, "전기 튀김기", SalesType.NEW, "제조사", "한국", null, "HTFR-00001"));
     }
 
     @Test

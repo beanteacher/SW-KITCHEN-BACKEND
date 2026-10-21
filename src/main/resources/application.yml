@@ -13,6 +13,11 @@ spring:
     locations: classpath:db/migration
   jackson:
     time-zone: Asia/Seoul
+  # 이미지 업로드 한 파일 10MB. 요청 전체는 파일 말고 경계 문자열 등이 붙어 조금 넉넉히 둔다
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
 
 security:
   jwt:
@@ -24,6 +29,10 @@ security:
     STAFF: [PRODUCT_MANAGE]
     ADMIN: [PRODUCT_MANAGE]
 
+# 이미지 공개 주소 앞부분 (스토리지 또는 CDN). 뒤에 키를 붙인다
+
+storage:
+  region: ap-northeast-2        # 서울
 management:
   endpoints:
     web:

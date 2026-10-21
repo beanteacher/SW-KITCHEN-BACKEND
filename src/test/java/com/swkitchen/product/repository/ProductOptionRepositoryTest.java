@@ -6,7 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.swkitchen.RepositoryTest;
 import com.swkitchen.category.domain.Category;
 import com.swkitchen.category.repository.CategoryRepository;
+import com.swkitchen.product.domain.Dimensions;
 import com.swkitchen.product.domain.DiscountType;
+import com.swkitchen.product.domain.Price;
 import com.swkitchen.product.domain.Product;
 import com.swkitchen.product.domain.ProductOption;
 import com.swkitchen.product.domain.SalesType;
@@ -43,19 +45,24 @@ class ProductOptionRepositoryTest {
         Category top = categoryRepository.saveAndFlush(Category.create(null, "작업대·싱크", "WS", 1));
         Category table = categoryRepository.saveAndFlush(Category.create(top, "작업대", "WT", 1));
         product = productRepository.saveAndFlush(
-            Product.create(table, "스텐 작업대", SalesType.USED, "대성", "국산", "WSWT-00015"));
+            Product.create(table, "스텐 작업대", SalesType.USED, "대성", "국산", "강직도 좋은 스텐 작업대", "WSWT-00015"));
     }
 
     @Test
     @DisplayName("옵션을 저장하고 다시 읽는다. 판매가가 함께 저장된다")
     void saveAndRead() {
         ProductOption option = optionRepository.saveAndFlush(ProductOption.create(
-            product, "WSM-1243RF", 900, 600, 800, 15_000, DiscountType.RATE, 17, 1, "products/a.jpg"));
+            product,
+            "WSM-1243RF",
+            new Dimensions(900, 600, 800),
+            Price.of(15_000, DiscountType.RATE, 17),
+            1,
+            "products/a.jpg"));
         em.clear();
 
         ProductOption saved = optionRepository.findById(option.getId()).orElseThrow();
         assertThat(saved.getProductCode()).isEqualTo("WSWT-00015-01");
-        assertThat(saved.getSalePrice()).isEqualTo(12_400);
+        assertThat(saved.getPrice().getSalePrice()).isEqualTo(12_400);
         assertThat(saved.getStockQty()).isEqualTo(1);
         assertThat(saved.getReservedQty()).isZero();
         assertThat(saved.getVersion()).isZero();
@@ -66,7 +73,7 @@ class ProductOptionRepositoryTest {
     void versionIncreases() {
         ProductOption option = optionRepository.saveAndFlush(option(900, 15_000, DiscountType.NONE, null));
 
-        option.changePrice(20_000, DiscountType.AMOUNT, 1_000);
+        option.change(null, option.getDimensions(), Price.of(20_000, DiscountType.AMOUNT, 1_000), 1, "products/a.jpg");
         optionRepository.flush();
 
         assertThat(option.getVersion()).isEqualTo(1);
@@ -107,7 +114,12 @@ class ProductOptionRepositoryTest {
     }
 
     private ProductOption option(int widthMm, int listPrice, DiscountType discountType, Integer discountValue) {
-        return ProductOption.create(product, null, widthMm, 600, 800, listPrice, discountType, discountValue, 1,
+        return ProductOption.create(
+            product,
+            null,
+            new Dimensions(widthMm, 600, 800),
+            Price.of(listPrice, discountType, discountValue),
+            1,
             "products/a.jpg");
     }
 }

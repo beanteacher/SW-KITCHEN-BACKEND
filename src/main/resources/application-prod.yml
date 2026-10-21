@@ -12,3 +12,14 @@ security:
   initial-admin:
     user-id: ${ADMIN_USER_ID:}
     password: ${ADMIN_PASSWORD:}
+
+image:
+  base-url: ${IMAGE_BASE_URL}
+storage:
+  bucket: ${S3_BUCKET}
+# API 문서는 개발에서만 연다. 공개하면 관리자 API 목록이 밖에 드러난다
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

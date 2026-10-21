@@ -259,6 +259,6 @@ class CategoryControllerTest {
     }
 
     private Product product(Category category, String code) {
-        return Product.create(category, "냉장고", SalesType.NEW, "제조사", "한국", code);
+        return Product.create(category, "냉장고", SalesType.NEW, "제조사", "한국", null, code);
     }
 }

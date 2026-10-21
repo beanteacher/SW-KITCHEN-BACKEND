@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.swkitchen.RepositoryTest;
 import com.swkitchen.category.domain.Category;
+import com.swkitchen.product.domain.Dimensions;
 import com.swkitchen.product.domain.DiscountType;
 import com.swkitchen.product.domain.OptionImage;
+import com.swkitchen.product.domain.Price;
 import com.swkitchen.product.domain.Product;
 import com.swkitchen.product.domain.ProductDetailImage;
 import com.swkitchen.product.domain.ProductImage;
@@ -28,12 +30,17 @@ class ProductImageMappingTest {
     void saveAndRead() {
         Category top = Category.create(null, "냉장·냉동", "RF", 1);
         Category fridge = Category.create(top, "업소용 냉장고", "UR", 1);
-        Product product = Product.create(fridge, "냉장고", SalesType.NEW, "제조사", "한국", "RFUR-00001");
+        Product product = Product.create(fridge, "냉장고", SalesType.NEW, "제조사", "한국", "설명", "RFUR-00001");
         em.persist(top);
         em.persist(fridge);
         em.persist(product);
-        ProductOption option = ProductOption.create(product, null, 900, 600, 800, 10_000, DiscountType.NONE, null,
-            null, "products/main.jpg");
+        ProductOption option = ProductOption.create(
+            product,
+            null,
+            new Dimensions(900, 600, 800),
+            Price.of(10_000, DiscountType.NONE, null),
+            null,
+            "products/main.jpg");
         em.persist(option);
 
         ProductImage image = ProductImage.create(product, "products/a.jpg", 1);

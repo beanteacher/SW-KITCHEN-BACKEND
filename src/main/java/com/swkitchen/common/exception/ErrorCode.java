@@ -25,6 +25,20 @@ public enum ErrorCode {
     CATEGORY_ORDER_MISMATCH(HttpStatus.BAD_REQUEST, "분류 목록이 바뀌었습니다. 다시 불러와 주세요."),
     CATEGORY_IN_USE(HttpStatus.CONFLICT, "하위 분류나 제품이 연결된 분류는 삭제할 수 없습니다."),
     CATEGORY_ABBR_LOCKED(HttpStatus.CONFLICT, "제품이 연결된 분류는 약어를 바꿀 수 없습니다."),
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "제품을 찾을 수 없습니다."),
+    OPTION_NOT_IN_PRODUCT(HttpStatus.BAD_REQUEST, "이 제품의 옵션이 아닙니다."),
+    OPTION_SIZE_DUPLICATE(HttpStatus.BAD_REQUEST, "같은 치수의 옵션이 있습니다."),
+    SPEC_NAME_DUPLICATE(HttpStatus.BAD_REQUEST, "같은 이름의 사양이 있습니다."),
+    // 지운 옵션 번호도 센다
+    OPTION_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "한 제품의 옵션은 99개까지 만들 수 있습니다."),
+    OPTION_IN_USE(HttpStatus.CONFLICT, "잡아 둔 수량이 있는 옵션은 삭제할 수 없습니다."),
+    STOCK_BELOW_RESERVED(HttpStatus.CONFLICT, "재고를 잡아 둔 수량보다 적게 바꿀 수 없습니다."),
+    SALES_TYPE_CHANGE_NOT_ALLOWED(HttpStatus.CONFLICT, "판매 구분을 이렇게 바꿀 수 없습니다."),
+    // 불러온 뒤 다른 담당자나 주문이 옵션을 바꿨다. 화면은 다시 불러온다
+    CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "다른 곳에서 먼저 수정했습니다. 다시 불러와 주세요."),
+    // 확장자가 아니라 파일 앞부분으로 형식을 본다
+    IMAGE_INVALID_TYPE(HttpStatus.BAD_REQUEST, "JPG·PNG·WEBP 이미지만 올릴 수 있습니다."),
+    IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "이미지는 10MB 까지 올릴 수 있습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 요청 형식입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
