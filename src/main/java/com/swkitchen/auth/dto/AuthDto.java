@@ -42,8 +42,7 @@ public class AuthDto {
             String accessToken,
             String refreshToken) {
 
-        public static LoginResult of(Account account, boolean passwordChangeRecommended, String accessToken,
-                String refreshToken) {
+        public static LoginResult of(Account account, boolean passwordChangeRecommended, String accessToken, String refreshToken) {
             return new LoginResult(
                 account.getId(),
                 account.getUserId(),

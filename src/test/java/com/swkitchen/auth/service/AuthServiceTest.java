@@ -18,6 +18,7 @@ import com.swkitchen.auth.repository.AccountRepository;
 import com.swkitchen.auth.repository.RefreshTokenRepository;
 import com.swkitchen.common.exception.AppException;
 import com.swkitchen.common.exception.ErrorCode;
+import com.swkitchen.common.security.CryptoUtil;
 import com.swkitchen.common.security.JwtProvider;
 import com.swkitchen.common.security.SecurityProperties;
 import java.time.Duration;
@@ -81,7 +82,7 @@ class AuthServiceTest {
         assertThat(result.passwordChangeRecommended()).isFalse();
         assertThat(saved.getValue().getAccount().getId()).isEqualTo(1L);
         assertThat(saved.getValue().getTokenHash())
-            .isEqualTo(AuthService.sha256(result.refreshToken()))
+            .isEqualTo(CryptoUtil.sha256(result.refreshToken()))
             .isNotEqualTo(result.refreshToken());
         assertThat(saved.getValue().getExpiresAt())
             .isBetween(LocalDateTime.now().plusDays(14).minusMinutes(1), LocalDateTime.now().plusDays(14));
@@ -134,7 +135,7 @@ class AuthServiceTest {
     void logout() {
         authService.logout(1L, "refresh");
 
-        verify(refreshTokenRepository).deleteByTokenHashAndAccountId(AuthService.sha256("refresh"), 1L);
+        verify(refreshTokenRepository).deleteByTokenHashAndAccountId(CryptoUtil.sha256("refresh"), 1L);
     }
 
     @Test
@@ -158,7 +159,7 @@ class AuthServiceTest {
         authService.changePassword(1L, "refresh", new AuthDto.ChangePasswordRequest("pass1234", "newpass"));
 
         assertThat(staff.getPasswordHash()).isEqualTo("new-hash");
-        verify(refreshTokenRepository).deleteByAccountIdAndTokenHashNot(1L, AuthService.sha256("refresh"));
+        verify(refreshTokenRepository).deleteByAccountIdAndTokenHashNot(1L, CryptoUtil.sha256("refresh"));
     }
 
     @Test
