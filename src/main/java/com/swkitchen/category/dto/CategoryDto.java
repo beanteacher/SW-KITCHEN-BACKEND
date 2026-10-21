@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
-import java.util.Map;
 
 public class CategoryDto {
 
@@ -67,10 +66,8 @@ public class CategoryDto {
             long productCount,
             List<AdminTreeResponse> children) {
 
-        public static AdminTreeResponse of(Category category, Map<Long, Long> productCounts,
-                List<AdminTreeResponse> children) {
-            long count = productCounts.getOrDefault(category.getId(), 0L)
-                + children.stream().mapToLong(AdminTreeResponse::productCount).sum();
+        public static AdminTreeResponse of(Category category, long ownProductCount, List<AdminTreeResponse> children) {
+            long count = ownProductCount + children.stream().mapToLong(AdminTreeResponse::productCount).sum();
             return new AdminTreeResponse(
                 category.getId(),
                 category.getName(),

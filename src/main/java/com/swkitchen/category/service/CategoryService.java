@@ -40,14 +40,14 @@ public class CategoryService {
     @Transactional(readOnly = true)
     public List<CategoryDto.AdminTreeResponse> getAdminTree() {
         List<Category> parents = categoryRepository.findByParentIsNullOrderBySortOrderAscIdAsc();
+        // 분류 id → 그 분류에 직접 연결된 제품 수. 제품이 없는 분류는 없다
         Map<Long, Long> productCounts = productRepository.countByCategory().stream()
-            .collect(Collectors.toMap(ProductDto.CategoryProductCount::categoryId,
+            .collect(Collectors.toMap(
+                ProductDto.CategoryProductCount::categoryId,
                 ProductDto.CategoryProductCount::productCount));
 
         return parents.stream()
-            .map(parent -> CategoryDto.AdminTreeResponse.of(parent, productCounts, parent.getChildren().stream()
-                .map(child -> CategoryDto.AdminTreeResponse.of(child, productCounts, List.of()))
-                .toList()))
+            .map(parent -> toAdminTree(parent, productCounts))
             .toList();
     }
 
@@ -128,6 +128,17 @@ public class CategoryService {
             category.getParent().removeChild(category);
         }
         categoryRepository.delete(category);
+    }
+
+    private CategoryDto.AdminTreeResponse toAdminTree(Category parent, Map<Long, Long> productCounts) {
+        List<CategoryDto.AdminTreeResponse> children = parent.getChildren().stream()
+            .map(child -> CategoryDto.AdminTreeResponse.of(
+                child,
+                productCounts.getOrDefault(child.getId(), 0L),
+                List.of()))
+            .toList();
+
+        return CategoryDto.AdminTreeResponse.of(parent, productCounts.getOrDefault(parent.getId(), 0L), children);
     }
 
     private boolean hasProducts(Category category) {

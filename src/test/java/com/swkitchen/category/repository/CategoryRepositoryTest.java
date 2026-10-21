@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @RepositoryTest
 class CategoryRepositoryTest {
@@ -20,6 +21,9 @@ class CategoryRepositoryTest {
 
     @Autowired
     CategoryRepository categoryRepository;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Test
     @DisplayName("대분류 아래에 중분류를 만든다")
@@ -71,8 +75,10 @@ class CategoryRepositoryTest {
     @Test
     @DisplayName("없는 부모 아래에는 만들 수 없다")
     void parentMustExist() {
-        assertThatThrownBy(() -> categoryRepository.saveAndFlush(Category.create(em.getReference(Category.class, 999_999L), "업소용 냉장고", "UR", 1)))
-            .isInstanceOf(DataIntegrityViolationException.class);
+        // create 가 부모의 하위 목록에 넣으려고 부모를 읽으므로, 엔티티로는 없는 부모를 넘길 수 없다
+        assertThatThrownBy(() -> jdbc.update(
+            "INSERT INTO category (parent_id, name, abbr, sort_order) VALUES (999999, '업소용 냉장고', 'UR', 1)"))
+            .hasMessageContaining("fk_category_parent");
     }
 
     @Test
