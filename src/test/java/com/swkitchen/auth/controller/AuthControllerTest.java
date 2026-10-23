@@ -116,6 +116,56 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("내 정보: 로그인하면 id·아이디·역할을 주고, 로그인 안 하면 401 UNAUTHORIZED")
+    void me() throws Exception {
+        Cookie access = login("staff1", "pass1234").andReturn().getResponse().getCookie("access_token");
+
+        mvc.perform(get("/api/v1/auth/me").cookie(access))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.userId").value("staff1"))
+            .andExpect(jsonPath("$.data.role").value("STAFF"))
+            .andExpect(jsonPath("$.data.passwordChangeRecommended").doesNotExist());
+        mvc.perform(get("/api/v1/auth/me"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("재발급: 리프레시 토큰 쿠키로 두 토큰을 새로 받고, 쓴 리프레시 토큰은 다시 못 쓴다")
+    void refresh() throws Exception {
+        Cookie oldRefresh = login("staff1", "pass1234").andReturn().getResponse().getCookie("refresh_token");
+
+        MvcResult refreshed = mvc.perform(post("/api/v1/auth/refresh").cookie(oldRefresh))
+            .andExpect(status().isOk())
+            .andExpect(cookie().httpOnly("access_token", true))
+            .andExpect(cookie().path("refresh_token", "/api/v1/auth"))
+            .andReturn();
+        Cookie newAccess = refreshed.getResponse().getCookie("access_token");
+        Cookie newRefresh = refreshed.getResponse().getCookie("refresh_token");
+
+        assertThat(newRefresh.getValue()).isNotEqualTo(oldRefresh.getValue());
+        assertThat(refreshTokenRepository.findByTokenHash(sha256(oldRefresh.getValue()))).isEmpty();
+        assertThat(refreshTokenRepository.findByTokenHash(sha256(newRefresh.getValue()))).isPresent();
+        mvc.perform(get("/api/v1/auth/me").cookie(newAccess))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.userId").value("staff1"));
+        mvc.perform(post("/api/v1/auth/refresh").cookie(oldRefresh))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("재발급: 리프레시 토큰 쿠키가 없으면 로그인 없이도 401 UNAUTHORIZED (만료된 액세스 토큰이 같이 와도 같다)")
+    void refreshWithoutCookie() throws Exception {
+        mvc.perform(post("/api/v1/auth/refresh"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        mvc.perform(post("/api/v1/auth/refresh").cookie(new Cookie("access_token", "expired.or.broken")))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
     @DisplayName("로그아웃: 이 리프레시 토큰 행을 지우고 두 쿠키를 지운다")
     void logout() throws Exception {
         MvcResult loggedIn = login("staff1", "pass1234").andReturn();

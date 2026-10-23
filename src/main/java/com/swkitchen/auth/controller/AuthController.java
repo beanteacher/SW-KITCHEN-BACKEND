@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,6 +36,23 @@ public class AuthController {
             .header(HttpHeaders.SET_COOKIE, authCookies.accessToken(result.accessToken()).toString())
             .header(HttpHeaders.SET_COOKIE, authCookies.refreshToken(result.refreshToken()).toString())
             .body(ApiResponse.success(AuthDto.LoginResponse.from(result)));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<Void>> refresh(@CookieValue(name = REFRESH_TOKEN, required = false) String refreshToken) {
+        AuthDto.RefreshResult result = authService.refresh(refreshToken);
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, authCookies.accessToken(result.accessToken()).toString())
+            .header(HttpHeaders.SET_COOKIE, authCookies.refreshToken(result.refreshToken()).toString())
+            .body(ApiResponse.success(null));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<AuthDto.MeResponse>> me(@AuthenticationPrincipal Long accountId) {
+        AuthDto.MeResponse me = authService.me(accountId);
+
+        return ResponseEntity.ok(ApiResponse.success(me));
     }
 
     @PostMapping("/logout")

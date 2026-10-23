@@ -42,17 +42,39 @@ public class AuthService {
             throw new AppException(ErrorCode.LOGIN_FAILED);
         }
 
-        String token = CryptoUtil.randomToken(REFRESH_TOKEN_BYTES);
-        LocalDateTime expiresAt = LocalDateTime.now().plus(properties.jwt().refreshTokenTtl());
-        RefreshToken refreshToken = RefreshToken.create(
-            account,
-            CryptoUtil.sha256(token),
-            expiresAt);
-        refreshTokenRepository.save(refreshToken);
+        String token = createRefreshToken(account);
 
         return AuthDto.LoginResult.of(
             account,
             isInitialPassword(request.password()),
+            jwtProvider.createAccessToken(account.getId(), account.getRole()),
+            token);
+    }
+
+    @Transactional(readOnly = true)
+    public AuthDto.MeResponse me(Long accountId) {
+        Account account = accountRepository.findById(accountId)
+            .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
+
+        return AuthDto.MeResponse.from(account);
+    }
+
+    /** 쓴 리프레시 토큰은 지우고 새로 준다. 같은 토큰을 두 번 쓸 수 없다 */
+    public AuthDto.RefreshResult refresh(String refreshToken) {
+        if (!StringUtils.hasText(refreshToken)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        RefreshToken saved = refreshTokenRepository.findByTokenHash(CryptoUtil.sha256(refreshToken))
+            .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
+        refreshTokenRepository.delete(saved);
+        if (saved.isExpired(LocalDateTime.now())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        Account account = saved.getAccount();
+        String token = createRefreshToken(account);
+
+        return new AuthDto.RefreshResult(
             jwtProvider.createAccessToken(account.getId(), account.getRole()),
             token);
     }
@@ -79,6 +101,20 @@ public class AuthService {
         } else {
             refreshTokenRepository.deleteByAccountId(accountId);
         }
+    }
+
+    // 원문은 쿠키로 돌려주고 DB 에는 해시만 둔다
+    private String createRefreshToken(Account account) {
+        String token = CryptoUtil.randomToken(REFRESH_TOKEN_BYTES);
+        LocalDateTime expiresAt = LocalDateTime.now().plus(properties.jwt().refreshTokenTtl());
+        RefreshToken refreshToken = RefreshToken.create(
+            account,
+            CryptoUtil.sha256(token),
+            expiresAt);
+
+        refreshTokenRepository.save(refreshToken);
+
+        return token;
     }
 
     private boolean isWrongPassword(String password, String passwordHash) {

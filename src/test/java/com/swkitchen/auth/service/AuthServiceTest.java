@@ -147,6 +147,69 @@ class AuthServiceTest {
         verifyNoInteractions(refreshTokenRepository);
     }
 
+    // ── 내 정보 ──
+
+    @Test
+    @DisplayName("내 정보: 로그인한 계정의 id·아이디·역할을 준다")
+    void me() {
+        given(accountRepository.findById(1L)).willReturn(Optional.of(staff));
+
+        AuthDto.MeResponse me = authService.me(1L);
+
+        assertThat(me).isEqualTo(new AuthDto.MeResponse(1L, "staff1", Role.STAFF));
+    }
+
+    @Test
+    @DisplayName("내 정보: 토큰은 유효한데 계정이 지워졌으면 UNAUTHORIZED")
+    void meDeletedAccount() {
+        given(accountRepository.findById(1L)).willReturn(Optional.empty());
+
+        assertErrorCode(() -> authService.me(1L), ErrorCode.UNAUTHORIZED);
+    }
+
+    // ── 토큰 재발급 ──
+
+    @Test
+    @DisplayName("재발급: 쓴 리프레시 토큰 행은 지우고, 새 토큰을 해시로 14일 뒤 만료로 저장한다")
+    void refresh() {
+        RefreshToken old = RefreshToken.create(staff, CryptoUtil.sha256("old"), LocalDateTime.now().plusDays(1));
+        given(refreshTokenRepository.findByTokenHash(CryptoUtil.sha256("old"))).willReturn(Optional.of(old));
+        given(jwtProvider.createAccessToken(1L, Role.STAFF)).willReturn("access");
+
+        AuthDto.RefreshResult result = authService.refresh("old");
+
+        verify(refreshTokenRepository).delete(old);
+        ArgumentCaptor<RefreshToken> saved = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenRepository).save(saved.capture());
+        assertThat(result.accessToken()).isEqualTo("access");
+        assertThat(result.refreshToken()).isNotEqualTo("old");
+        assertThat(saved.getValue().getTokenHash()).isEqualTo(CryptoUtil.sha256(result.refreshToken()));
+        assertThat(saved.getValue().getExpiresAt())
+            .isBetween(LocalDateTime.now().plusDays(14).minusMinutes(1), LocalDateTime.now().plusDays(14));
+    }
+
+    @Test
+    @DisplayName("재발급: 만료된 토큰은 행을 지우고 UNAUTHORIZED, 새 토큰은 주지 않는다")
+    void refreshExpired() {
+        RefreshToken old = RefreshToken.create(staff, CryptoUtil.sha256("old"), LocalDateTime.now().minusSeconds(1));
+        given(refreshTokenRepository.findByTokenHash(CryptoUtil.sha256("old"))).willReturn(Optional.of(old));
+
+        assertErrorCode(() -> authService.refresh("old"), ErrorCode.UNAUTHORIZED);
+        verify(refreshTokenRepository).delete(old);
+        verify(refreshTokenRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("재발급: 쿠키가 없거나 DB 에 없는 토큰이면 UNAUTHORIZED")
+    void refreshUnknown() {
+        given(refreshTokenRepository.findByTokenHash(anyString())).willReturn(Optional.empty());
+
+        assertErrorCode(() -> authService.refresh(null), ErrorCode.UNAUTHORIZED);
+        assertErrorCode(() -> authService.refresh(""), ErrorCode.UNAUTHORIZED);
+        assertErrorCode(() -> authService.refresh("unknown"), ErrorCode.UNAUTHORIZED);
+        verify(refreshTokenRepository, never()).save(any());
+    }
+
     // ── 비밀번호 변경 ──
 
     @Test

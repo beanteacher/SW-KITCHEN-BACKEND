@@ -31,6 +31,14 @@ public class AuthDto {
         }
     }
 
+    // 토큰을 자바스크립트가 못 읽으므로 화면은 이걸로 누가 로그인했는지 안다
+    public record MeResponse(Long id, String userId, Role role) {
+
+        public static MeResponse from(Account account) {
+            return new MeResponse(account.getId(), account.getUserId(), account.getRole());
+        }
+    }
+
     // ── 서비스 → 컨트롤러 (Result) ──
 
     // 토큰은 응답 본문이 아니라 쿠키로 나간다
@@ -51,5 +59,9 @@ public class AuthDto {
                 accessToken,
                 refreshToken);
         }
+    }
+
+    // 리프레시 때 두 토큰 모두 새로 준다. 둘 다 쿠키로 나간다
+    public record RefreshResult(String accessToken, String refreshToken) {
     }
 }
