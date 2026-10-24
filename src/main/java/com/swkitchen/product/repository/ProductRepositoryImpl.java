@@ -4,10 +4,14 @@ import static com.swkitchen.category.domain.QCategory.category;
 import static com.swkitchen.product.domain.QProduct.product;
 import static com.swkitchen.product.domain.QProductOption.productOption;
 
+import com.querydsl.core.types.Order;
+import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.JPAExpressions;
+import com.querydsl.jpa.JPQLSubQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.swkitchen.product.domain.Material;
 import com.swkitchen.product.domain.Product;
 import com.swkitchen.product.domain.SalesType;
 import com.swkitchen.product.dto.ProductDto;
@@ -36,6 +40,35 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
             .fetch();
     }
 
+    /** 고객 목록·검색. 재고품·중고품은 보이는 수량이 남은 제품만 나온다 (REQ-008) */
+    @Override
+    public Page<Product> search(ProductDto.SearchRequest request, Pageable pageable) {
+        BooleanExpression[] conditions = {
+            onSale(),
+            keywordMatches(request.keyword()),
+            inCategory(request.categoryId()),
+            salesTypeIn(request.salesType()),
+            hasAnyMaterial(request.materials())
+        };
+
+        List<Product> products = queryFactory
+            .selectFrom(product)
+            .join(product.category, category)
+            .where(conditions)
+            .orderBy(orderOf(request.orderBy()))
+            .offset(pageable.getOffset())
+            .limit(pageable.getPageSize())
+            .fetch();
+        Long total = queryFactory
+            .select(product.count())
+            .from(product)
+            .join(product.category, category)
+            .where(conditions)
+            .fetchOne();
+
+        return new PageImpl<>(products, pageable, total);
+    }
+
     /** 신규 등록순. 분류(대분류 포함)는 화면에 이름을 보여주려고 함께 읽는다 */
     @Override
     public Page<Product> searchAdmin(ProductDto.AdminSearchRequest request, Pageable pageable) {
@@ -62,6 +95,50 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
             .fetchOne();
 
         return new PageImpl<>(products, pageable, total);
+    }
+
+    /** 신제품은 늘 나온다. 재고품·중고품은 보이는 수량(재고 - 잡아 둔 수량)이 남은 옵션이 있어야 한다 */
+    private static BooleanExpression onSale() {
+        return product.salesType.eq(SalesType.NEW)
+            .or(optionExists(productOption.stockQty.subtract(productOption.reservedQty).goe(1)));
+    }
+
+    /** 제품명·제조사, 옵션의 상품 코드. 제조사 모델명은 고객에게 보이지 않아 찾지 않는다 (REQ-003) */
+    private static BooleanExpression keywordMatches(String keyword) {
+        if (keyword == null) {
+            return null;
+        }
+        String pattern = likePattern(keyword);
+        BooleanExpression matches = product.name.like(pattern, LIKE_ESCAPE)
+            .or(product.manufacturer.like(pattern, LIKE_ESCAPE));
+        BooleanExpression codeLike = productCodeLike(keyword);
+        // 조건 없이 optionExists 를 부르면 옵션이 있는 모든 제품이 맞는다
+        return codeLike == null ? matches : matches.or(optionExists(codeLike));
+    }
+
+    /** 고른 재질 중 하나라도 가진 제품 (REQ-010) */
+    private static BooleanExpression hasAnyMaterial(List<Material> materials) {
+        if (materials == null || materials.isEmpty()) {
+            return null;
+        }
+        return product.materials.any().in(materials);
+    }
+
+    /** 같은 값이면 신규 등록순. 가격순은 옵션 중 가장 낮은 판매가로 줄 세운다. 인기순은 주문 기능 전까지 신규 등록순이다 */
+    private static OrderSpecifier<?>[] orderOf(ProductDto.OrderBy orderBy) {
+        OrderSpecifier<Long> newest = product.id.desc();
+        return switch (orderBy) {
+            case POPULAR, NEWEST -> new OrderSpecifier<?>[] {newest};
+            case PRICE_ASC -> new OrderSpecifier<?>[] {new OrderSpecifier<>(Order.ASC, lowestSalePrice()), newest};
+            case PRICE_DESC -> new OrderSpecifier<?>[] {new OrderSpecifier<>(Order.DESC, lowestSalePrice()), newest};
+        };
+    }
+
+    private static JPQLSubQuery<Integer> lowestSalePrice() {
+        return JPAExpressions
+            .select(productOption.price.salePrice.min())
+            .from(productOption)
+            .where(productOption.product.eq(product));
     }
 
     /** 제품명, 옵션의 상품 코드·제조사 모델명 */

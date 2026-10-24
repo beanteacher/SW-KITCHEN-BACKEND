@@ -69,6 +69,23 @@ public class ProductService {
         return ProductDto.AdminResponse.of(product, imageProperties::urlOf);
     }
 
+    /** 고객 목록·검색 한 페이지. 옵션은 그 페이지 제품 것을 Hibernate 가 IN 쿼리 한 번으로 읽는다 */
+    @Transactional(readOnly = true)
+    public PageResponse<ProductDto.SummaryResponse> search(ProductDto.SearchRequest request, Pageable pageable) {
+        Page<Product> products = productRepository.search(request, pageable);
+
+        return PageResponse.from(products.map(product -> ProductDto.SummaryResponse.of(product, imageProperties::urlOf)));
+    }
+
+    /** 고객 상세. 보이는 수량이 0 인 재고품·중고품도 목록에서만 빠지고 상세는 열린다 (DEC-076) */
+    @Transactional(readOnly = true)
+    public ProductDto.DetailResponse get(Long id) {
+        Product product = productRepository.findById(id)
+            .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        return ProductDto.DetailResponse.of(product, imageProperties::urlOf);
+    }
+
     /** 관리 목록 한 페이지. 옵션은 그 페이지 제품 것을 Hibernate 가 IN 쿼리 한 번으로 읽는다 */
     @Transactional(readOnly = true)
     public PageResponse<ProductDto.AdminSummaryResponse> searchAdmin(ProductDto.AdminSearchRequest request, Pageable pageable) {

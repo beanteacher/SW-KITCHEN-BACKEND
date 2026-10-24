@@ -15,6 +15,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.UnaryOperator;
 import org.hibernate.validator.constraints.Range;
@@ -127,6 +128,164 @@ public class ProductDto {
                 imageResponses,
                 detailImageResponses,
                 optionResponses);
+        }
+    }
+
+    // 고객 목록·검색 조건 (SCR-001~003). 모두 비우면 전체 제품이다. 검색어는 앞뒤 공백을 지우고, 비면 조건에서 뺀다
+    public record SearchRequest(
+            List<SalesType> salesType,
+            Long categoryId,
+            List<Material> materials,
+            @Size(max = 50, message = "검색어는 50자 이하입니다.") String keyword,
+            OrderBy orderBy) {
+
+        public SearchRequest {
+            keyword = keyword == null || keyword.isBlank() ? null : keyword.strip();
+            orderBy = orderBy == null ? OrderBy.POPULAR : orderBy;
+        }
+    }
+
+    // 같은 값이면 신규 등록순. 인기순은 주문 기능 전까지 신규 등록순과 같다 (C3 4장)
+    public enum OrderBy {
+        POPULAR, NEWEST, PRICE_ASC, PRICE_DESC
+    }
+
+    // 목록 카드 한 장. 대표 이미지는 첫 번째 옵션 것, 가격은 판매가가 가장 낮은 옵션 것(같으면 앞 번호)
+    // 신제품은 visibleQty 가 null
+    public record SummaryResponse(
+            Long id,
+            String name,
+            SalesType salesType,
+            String mainImageUrl,
+            PriceResponse price,
+            Integer visibleQty) {
+
+        public static SummaryResponse of(Product product, UnaryOperator<String> urlOf) {
+            List<ProductOption> options = product.getOptions();
+            ProductOption cheapest = options.stream()
+                .min(Comparator.comparingInt((ProductOption option) -> option.getPrice().getSalePrice())
+                    .thenComparingInt(ProductOption::getOptionNo))
+                .orElseThrow();
+            boolean varies = options.stream()
+                .map(option -> option.getPrice().getSalePrice())
+                .distinct()
+                .count() > 1;
+            Integer visibleQty = product.getSalesType() == SalesType.NEW
+                ? null
+                : options.stream().mapToInt(ProductOption::visibleQty).sum();
+
+            return new SummaryResponse(
+                product.getId(),
+                product.getName(),
+                product.getSalesType(),
+                urlOf.apply(options.get(0).getMainImageKey()),
+                PriceResponse.of(cheapest.getPrice(), varies),
+                visibleQty);
+        }
+    }
+
+    // varies 는 옵션마다 판매가가 달라 화면이 "~" 를 붙여야 하는지
+    public record PriceResponse(
+            int salePrice,
+            int listPrice,
+            DiscountType discountType,
+            Integer discountValue,
+            boolean varies) {
+
+        public static PriceResponse of(Price price, boolean varies) {
+            return new PriceResponse(
+                price.getSalePrice(),
+                price.getListPrice(),
+                price.getDiscountType(),
+                price.getDiscountValue(),
+                varies);
+        }
+    }
+
+    // 고객용 상세 (SCR-004). 모델명·재고·잡아 둔 수량은 넣지 않고 보이는 수량만 준다
+    public record DetailResponse(
+            Long id,
+            String name,
+            SalesType salesType,
+            CategoryRef category,
+            String manufacturer,
+            String origin,
+            List<MaterialResponse> materials,
+            List<SpecResponse> specs,
+            String description,
+            List<String> imageUrls,
+            List<String> detailImageUrls,
+            List<OptionResponse> options) {
+
+        public static DetailResponse of(Product product, UnaryOperator<String> urlOf) {
+            List<MaterialResponse> materialResponses = product.getMaterials().stream()
+                .sorted()
+                .map(MaterialResponse::from)
+                .toList();
+            List<SpecResponse> specResponses = product.getSpecs().stream()
+                .map(SpecResponse::from)
+                .toList();
+            List<String> imageUrls = product.getImages().stream()
+                .map(image -> urlOf.apply(image.getImageKey()))
+                .toList();
+            List<String> detailImageUrls = product.getDetailImages().stream()
+                .map(image -> urlOf.apply(image.getImageKey()))
+                .toList();
+            List<OptionResponse> optionResponses = product.getOptions().stream()
+                .map(option -> OptionResponse.of(option, urlOf))
+                .toList();
+
+            return new DetailResponse(
+                product.getId(),
+                product.getName(),
+                product.getSalesType(),
+                CategoryRef.from(product.getCategory()),
+                product.getManufacturer(),
+                product.getOrigin(),
+                materialResponses,
+                specResponses,
+                product.getDescription(),
+                imageUrls,
+                detailImageUrls,
+                optionResponses);
+        }
+    }
+
+    // 보이는 수량이 0 인 옵션도 준다. 화면이 품절로 보여준다. 신제품은 visibleQty 가 null
+    public record OptionResponse(
+            Long id,
+            String productCode,
+            int widthMm,
+            int depthMm,
+            int heightMm,
+            int listPrice,
+            DiscountType discountType,
+            Integer discountValue,
+            int salePrice,
+            Integer visibleQty,
+            String mainImageUrl,
+            List<String> imageUrls) {
+
+        public static OptionResponse of(ProductOption option, UnaryOperator<String> urlOf) {
+            Dimensions dimensions = option.getDimensions();
+            Price price = option.getPrice();
+            List<String> imageUrls = option.getImages().stream()
+                .map(image -> urlOf.apply(image.getImageKey()))
+                .toList();
+
+            return new OptionResponse(
+                option.getId(),
+                option.getProductCode(),
+                dimensions.widthMm(),
+                dimensions.depthMm(),
+                dimensions.heightMm(),
+                price.getListPrice(),
+                price.getDiscountType(),
+                price.getDiscountValue(),
+                price.getSalePrice(),
+                option.visibleQty(),
+                urlOf.apply(option.getMainImageKey()),
+                imageUrls);
         }
     }
 
