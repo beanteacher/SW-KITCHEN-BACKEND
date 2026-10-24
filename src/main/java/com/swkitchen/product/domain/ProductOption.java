@@ -94,6 +94,11 @@ public class ProductOption {
         return option;
     }
 
+    /** 손님에게 보이는 수량. 신제품은 재고를 세지 않아 null */
+    public Integer visibleQty() {
+        return stockQty == null ? null : stockQty - reservedQty;
+    }
+
     /** 상품 코드·잡아 둔 수량은 바꾸지 않는다 */
     public void change(String modelName, Dimensions dimensions, Price price, Integer stockQty, String mainImageKey) {
         this.modelName = modelName;

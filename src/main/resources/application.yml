@@ -12,6 +12,13 @@ spring:
       hibernate.default_batch_fetch_size: 100   # 여러 부모의 자식 목록을 IN 쿼리 한 번으로 읽는다
   flyway:
     locations: classpath:db/migration
+  # 목록 페이지. ?page=1 부터 센다
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
+        one-indexed-parameters: true
   jackson:
     time-zone: Asia/Seoul
   # 이미지 업로드 한 파일 10MB. 요청 전체는 파일 말고 경계 문자열 등이 붙어 조금 넉넉히 둔다

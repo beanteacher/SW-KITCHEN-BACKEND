@@ -4,6 +4,7 @@ import com.swkitchen.category.domain.Category;
 import com.swkitchen.category.repository.CategoryRepository;
 import com.swkitchen.common.config.ImageProperties;
 import com.swkitchen.common.dto.ErrorResponse;
+import com.swkitchen.common.dto.PageResponse;
 import com.swkitchen.common.exception.AppException;
 import com.swkitchen.common.exception.ErrorCode;
 import com.swkitchen.product.domain.Dimensions;
@@ -33,6 +34,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,6 +67,14 @@ public class ProductService {
         Product product = productRepository.findById(id)
             .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
         return ProductDto.AdminResponse.of(product, imageProperties::urlOf);
+    }
+
+    /** 관리 목록 한 페이지. 옵션은 그 페이지 제품 것을 Hibernate 가 IN 쿼리 한 번으로 읽는다 */
+    @Transactional(readOnly = true)
+    public PageResponse<ProductDto.AdminSummaryResponse> searchAdmin(ProductDto.AdminSearchRequest request, Pageable pageable) {
+        Page<Product> products = productRepository.searchAdmin(request, pageable);
+
+        return PageResponse.from(products.map(ProductDto.AdminSummaryResponse::from));
     }
 
     /** 제품을 새로 등록한다. 상품 코드 앞자리(예: RFUR-00001)를 발급하고 옵션마다 -01, -02 ... 를 붙인다 */

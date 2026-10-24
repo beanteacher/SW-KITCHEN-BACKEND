@@ -130,6 +130,64 @@ public class ProductDto {
         }
     }
 
+    // 관리 목록 검색 조건. 모두 비우면 전체 제품이다. 검색어는 앞뒤 공백을 지우고, 비면 조건에서 뺀다
+    public record AdminSearchRequest(
+            @Size(max = 50, message = "검색어는 50자 이하입니다.") String keyword,
+            Long categoryId,
+            List<SalesType> salesType) {
+
+        public AdminSearchRequest {
+            keyword = keyword == null || keyword.isBlank() ? null : keyword.strip();
+        }
+    }
+
+    // 관리 목록 한 줄. categoryName 은 "대분류 > 중분류"
+    public record AdminSummaryResponse(
+            Long id,
+            String name,
+            SalesType salesType,
+            String categoryName,
+            String manufacturer,
+            List<AdminSummaryOptionResponse> options) {
+
+        public static AdminSummaryResponse from(Product product) {
+            Category category = product.getCategory();
+            List<AdminSummaryOptionResponse> optionResponses = product.getOptions().stream()
+                .map(AdminSummaryOptionResponse::from)
+                .toList();
+
+            return new AdminSummaryResponse(
+                product.getId(),
+                product.getName(),
+                product.getSalesType(),
+                category.getParent().getName() + " > " + category.getName(),
+                product.getManufacturer(),
+                optionResponses);
+        }
+    }
+
+    // 신제품은 stockQty·visibleQty 가 null
+    public record AdminSummaryOptionResponse(
+            Long id,
+            String productCode,
+            String modelName,
+            int salePrice,
+            Integer stockQty,
+            int reservedQty,
+            Integer visibleQty) {
+
+        public static AdminSummaryOptionResponse from(ProductOption option) {
+            return new AdminSummaryOptionResponse(
+                option.getId(),
+                option.getProductCode(),
+                option.getModelName(),
+                option.getPrice().getSalePrice(),
+                option.getStockQty(),
+                option.getReservedQty(),
+                option.visibleQty());
+        }
+    }
+
     public record CategoryRef(Long id, String name, CategoryRef parent) {
 
         public static CategoryRef from(Category category) {
