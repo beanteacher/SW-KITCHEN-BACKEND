@@ -65,7 +65,7 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
         return new PageImpl<>(products, pageable, total);
     }
 
-    /** 중분류별 개수. 분류 조건만 빼고 센다 (필터의 분류 줄) */
+    /** 중분류별 개수. 분류 조건만 빼고 센다 (필터의 분류 줄). 대분류는 서비스가 아래 중분류를 더한다 */
     @Override
     public List<ProductDto.CategoryProductCount> countOnSaleByCategory(ProductDto.SearchRequest request) {
         return queryFactory
@@ -74,18 +74,6 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
             .join(product.category, category)
             .where(onSaleConditions(request.withoutCategory()))
             .groupBy(category.id)
-            .fetch();
-    }
-
-    /** 대분류별 개수. 제품은 중분류에만 있어 그 부모로 묶는다 */
-    @Override
-    public List<ProductDto.CategoryProductCount> countOnSaleByParentCategory(ProductDto.SearchRequest request) {
-        return queryFactory
-            .select(Projections.constructor(ProductDto.CategoryProductCount.class, category.parent.id, product.count()))
-            .from(product)
-            .join(product.category, category)
-            .where(onSaleConditions(request.withoutCategory()))
-            .groupBy(category.parent.id)
             .fetch();
     }
 

@@ -14,8 +14,6 @@ public interface ProductRepositoryCustom {
 
     List<ProductDto.CategoryProductCount> countOnSaleByCategory(ProductDto.SearchRequest request);
 
-    List<ProductDto.CategoryProductCount> countOnSaleByParentCategory(ProductDto.SearchRequest request);
-
     List<ProductDto.SalesTypeCount> countOnSaleBySalesType(ProductDto.SearchRequest request);
 
     List<ProductDto.MaterialCount> countOnSaleByMaterial(ProductDto.SearchRequest request);

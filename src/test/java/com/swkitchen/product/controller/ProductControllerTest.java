@@ -1,5 +1,6 @@
 package com.swkitchen.product.controller;
 
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -107,8 +108,9 @@ class ProductControllerTest {
     }
 
     @Test
-    @DisplayName("필터 개수: 로그인 없이 열리고, 전체·대분류·중분류·판매 구분·재질별 개수를 준다")
-    void filterCount() throws Exception {
+    @DisplayName("필터: 로그인 없이 열리고, 분류 트리·판매 구분·재질을 0 인 줄까지 모두 개수와 함께 준다")
+    void filter() throws Exception {
+        Category freezer = categoryRepository.save(Category.create(fridge.getParent(), "업소용 냉동고", "UF", 2));
         create("""
             { "categoryId": %d, "name": "업소용 냉장고", "salesType": "STOCK", "manufacturer": "우성", "origin": "국산",
               "materials": ["STAINLESS", "PLASTIC"],
@@ -116,19 +118,27 @@ class ProductControllerTest {
                              "discountType": "NONE", "stockQty": 1, "mainImageKey": "%s" } ] }
             """.formatted(fridge.getId(), KEY1));
 
-        mvc.perform(get("/api/v1/product/filter-count").param("salesType", "STOCK", "USED").param("materials", "PLASTIC"))
+        // 재질 PLASTIC 을 고른 재고·중고품 화면. 재질 줄은 재질 조건 없이, 나머지 줄은 PLASTIC 조건을 지켜 센다
+        mvc.perform(get("/api/v1/product/filter").param("salesType", "STOCK", "USED").param("materials", "PLASTIC"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.categories.length()").value(2))
-            .andExpect(jsonPath("$.data.categories[0].categoryId").value(fridge.getParent().getId()))
+            .andExpect(jsonPath("$.data.categories[0].id").value(fridge.getParent().getId()))
+            .andExpect(jsonPath("$.data.categories[0].name").value("냉장·냉동"))
             .andExpect(jsonPath("$.data.categories[0].productCount").value(1))
-            .andExpect(jsonPath("$.data.categories[1].categoryId").value(fridge.getId()))
-            .andExpect(jsonPath("$.data.salesTypes[0].salesType").value("STOCK"))
-            .andExpect(jsonPath("$.data.salesTypes[0].productCount").value(1))
-            .andExpect(jsonPath("$.data.materials.length()").value(2));
-        mvc.perform(get("/api/v1/product/filter-count").param("salesType", "NEW"))
+            .andExpect(jsonPath("$.data.categories[0].children[0].name").value("업소용 냉장고"))
+            .andExpect(jsonPath("$.data.categories[0].children[0].productCount").value(1))
+            .andExpect(jsonPath("$.data.categories[0].children[1].id").value(freezer.getId()))
+            .andExpect(jsonPath("$.data.categories[0].children[1].productCount").value(0))
+            .andExpect(jsonPath("$.data.salesTypes[*].code", contains("NEW", "STOCK", "USED")))
+            .andExpect(jsonPath("$.data.salesTypes[1].productCount").value(1))
+            .andExpect(jsonPath("$.data.salesTypes[0].productCount").value(0))
+            .andExpect(jsonPath("$.data.materials[*].code", contains("STAINLESS", "ALUMINUM", "STEEL", "PLASTIC")))
+            .andExpect(jsonPath("$.data.materials[0].productCount").value(1))
+            .andExpect(jsonPath("$.data.materials[1].productCount").value(0));
+        // 신제품 화면에는 맞는 제품이 없다
+        mvc.perform(get("/api/v1/product/filter").param("salesType", "NEW"))
             .andExpect(jsonPath("$.data.total").value(0))
-            .andExpect(jsonPath("$.data.categories").isEmpty());
+            .andExpect(jsonPath("$.data.categories[0].productCount").value(0));
     }
 
     @Test

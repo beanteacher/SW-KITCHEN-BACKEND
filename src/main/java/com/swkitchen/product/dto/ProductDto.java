@@ -18,7 +18,6 @@ import jakarta.validation.constraints.Size;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.UnaryOperator;
-import java.util.stream.Stream;
 import org.hibernate.validator.constraints.Range;
 
 public class ProductDto {
@@ -159,24 +158,33 @@ public class ProductDto {
         }
     }
 
-    // 목록 필터 줄 옆 숫자 (C5 3.2). 다른 조건은 그대로 두고 그 줄만 골랐을 때 몇 개인지. 없는 줄은 0 이다
-    // total 은 분류 [전체], categories 에는 대분류·중분류가 함께 들어 있다
-    public record FilterCountResponse(
+    // 고객 목록 필터 패널 (C5 3.2). 줄마다 그 줄만 바꿔 골랐을 때의 제품 수이고, 다른 구역의 조건은 그대로 둔다
+    // total 은 분류 [전체] 줄. 분류는 백오피스에서 정한 순서, 판매 구분·재질은 enum 순서로 0 인 줄까지 모두 준다
+    public record FilterResponse(
             long total,
-            List<CategoryProductCount> categories,
-            List<SalesTypeCount> salesTypes,
-            List<MaterialCount> materials) {
+            List<FilterCategoryResponse> categories,
+            List<SalesTypeFilterResponse> salesTypes,
+            List<MaterialFilterResponse> materials) {
+    }
 
-        public static FilterCountResponse of(
-                List<CategoryProductCount> middles,
-                List<CategoryProductCount> tops,
-                List<SalesTypeCount> salesTypes,
-                List<MaterialCount> materials) {
-            long total = middles.stream().mapToLong(CategoryProductCount::productCount).sum();
-            List<CategoryProductCount> categories = Stream.concat(tops.stream(), middles.stream()).toList();
+    // 대분류의 개수는 아래 중분류 합이다. 제품은 중분류에만 있다
+    public record FilterCategoryResponse(
+            Long id,
+            String name,
+            long productCount,
+            List<FilterCategoryResponse> children) {
 
-            return new FilterCountResponse(total, categories, salesTypes, materials);
+        public static FilterCategoryResponse of(Category category, long ownProductCount, List<FilterCategoryResponse> children) {
+            long count = ownProductCount + children.stream().mapToLong(FilterCategoryResponse::productCount).sum();
+            return new FilterCategoryResponse(category.getId(), category.getName(), count, children);
         }
+    }
+
+    public record SalesTypeFilterResponse(SalesType code, long productCount) {
+    }
+
+    // 재질의 한글 이름은 프론트가 선언해 쓴다 (DEC-106)
+    public record MaterialFilterResponse(Material code, long productCount) {
     }
 
     // 같은 값이면 신규 등록순. 인기순은 주문 기능 전까지 신규 등록순과 같다 (C3 4장)

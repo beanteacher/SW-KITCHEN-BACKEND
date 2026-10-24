@@ -8,6 +8,7 @@ import com.swkitchen.common.dto.PageResponse;
 import com.swkitchen.common.exception.AppException;
 import com.swkitchen.common.exception.ErrorCode;
 import com.swkitchen.product.domain.Dimensions;
+import com.swkitchen.product.domain.Material;
 import com.swkitchen.product.domain.OptionImage;
 import com.swkitchen.product.domain.Product;
 import com.swkitchen.product.domain.ProductCodeSequence;
@@ -25,6 +26,7 @@ import com.swkitchen.product.repository.ProductOptionRepository;
 import com.swkitchen.product.repository.ProductRepository;
 import com.swkitchen.product.repository.ProductSpecRepository;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -77,14 +79,32 @@ public class ProductService {
         return PageResponse.from(products.map(product -> ProductDto.SummaryResponse.of(product, imageProperties::urlOf)));
     }
 
-    /** 고객 목록 필터 줄 옆 개수. 정렬·페이지와 관계없다 */
+    /** 고객 목록 필터 패널. 분류 트리·판매 구분·재질에 줄마다 개수를 붙인다. 정렬·페이지와 관계없다 */
     @Transactional(readOnly = true)
-    public ProductDto.FilterCountResponse countFilters(ProductDto.SearchRequest request) {
-        return ProductDto.FilterCountResponse.of(
-            productRepository.countOnSaleByCategory(request),
-            productRepository.countOnSaleByParentCategory(request),
-            productRepository.countOnSaleBySalesType(request),
-            productRepository.countOnSaleByMaterial(request));
+    public ProductDto.FilterResponse getFilter(ProductDto.SearchRequest request) {
+        // 중분류 id → 제품 수. 제품이 없는 줄은 없다
+        Map<Long, Long> categoryCounts = productRepository.countOnSaleByCategory(request).stream()
+            .collect(Collectors.toMap(
+                ProductDto.CategoryProductCount::categoryId,
+                ProductDto.CategoryProductCount::productCount));
+        Map<SalesType, Long> salesTypeCounts = productRepository.countOnSaleBySalesType(request).stream()
+            .collect(Collectors.toMap(ProductDto.SalesTypeCount::salesType, ProductDto.SalesTypeCount::productCount));
+        Map<Material, Long> materialCounts = productRepository.countOnSaleByMaterial(request).stream()
+            .collect(Collectors.toMap(ProductDto.MaterialCount::material, ProductDto.MaterialCount::productCount));
+
+        List<ProductDto.FilterCategoryResponse> categories = categoryRepository.findByParentIsNullOrderBySortOrderAscIdAsc()
+            .stream()
+            .map(parent -> toFilterCategory(parent, categoryCounts))
+            .toList();
+        long total = categories.stream().mapToLong(ProductDto.FilterCategoryResponse::productCount).sum();
+        List<ProductDto.SalesTypeFilterResponse> salesTypes = Arrays.stream(SalesType.values())
+            .map(salesType -> new ProductDto.SalesTypeFilterResponse(salesType, salesTypeCounts.getOrDefault(salesType, 0L)))
+            .toList();
+        List<ProductDto.MaterialFilterResponse> materials = Arrays.stream(Material.values())
+            .map(material -> new ProductDto.MaterialFilterResponse(material, materialCounts.getOrDefault(material, 0L)))
+            .toList();
+
+        return new ProductDto.FilterResponse(total, categories, salesTypes, materials);
     }
 
     /** 고객 상세. 보이는 수량이 0 인 재고품·중고품도 목록에서만 빠지고 상세는 열린다 (DEC-076) */
@@ -267,6 +287,17 @@ public class ProductService {
                 createOption(product, request.salesType(), req);
             }
         }
+    }
+
+    private static ProductDto.FilterCategoryResponse toFilterCategory(Category parent, Map<Long, Long> categoryCounts) {
+        List<ProductDto.FilterCategoryResponse> children = parent.getChildren().stream()
+            .map(child -> ProductDto.FilterCategoryResponse.of(
+                child,
+                categoryCounts.getOrDefault(child.getId(), 0L),
+                List.of()))
+            .toList();
+
+        return ProductDto.FilterCategoryResponse.of(parent, 0, children);
     }
 
     /** 옵션 하나를 다음 번호로 만들고 그 이미지까지 저장한다 */

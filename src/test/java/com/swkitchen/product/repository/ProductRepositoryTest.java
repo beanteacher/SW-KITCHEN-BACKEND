@@ -230,13 +230,10 @@ class ProductRepositoryTest {
 
         // 재질 STAINLESS 를 고른 상태: 분류·판매 구분 개수는 재질 조건을 지키고, 재질 개수는 재질 조건 없이 센다
         ProductDto.SearchRequest stainless = request(null, null, List.of(Material.STAINLESS), null, null);
-        Long top = fridge.getParent().getId();
 
         assertThat(productRepository.countOnSaleByCategory(stainless)).containsExactlyInAnyOrder(
             new ProductDto.CategoryProductCount(fridge.getId(), 1),
             new ProductDto.CategoryProductCount(freezer.getId(), 1));
-        assertThat(productRepository.countOnSaleByParentCategory(stainless)).containsExactly(
-            new ProductDto.CategoryProductCount(top, 2));
         assertThat(productRepository.countOnSaleBySalesType(stainless)).containsExactlyInAnyOrder(
             new ProductDto.SalesTypeCount(SalesType.NEW, 1),
             new ProductDto.SalesTypeCount(SalesType.STOCK, 1));
