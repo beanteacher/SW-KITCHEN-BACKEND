@@ -58,7 +58,8 @@ class AuthServiceTest {
         SecurityProperties properties = new SecurityProperties(
             new SecurityProperties.Jwt("secret", Duration.ofMinutes(30), Duration.ofDays(14)),
             Map.of(),
-            new SecurityProperties.InitialAdmin("admin", "init-pass"));
+            new SecurityProperties.InitialAdmin("admin", "init-pass"),
+            null);
         authService = new AuthService(accountRepository, refreshTokenRepository, passwordEncoder, jwtProvider, properties);
 
         staff = Account.create("staff1", "hash", Role.STAFF);

@@ -38,7 +38,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
+// 테스트는 로컬 설정으로 켜지지만, 쿠키 모양은 운영(Secure 켬)과 같게 확인한다
+@SpringBootTest(properties = "security.cookie-secure=true")
 @AutoConfigureMockMvc
 @Import(TestcontainersConfig.class)
 @Transactional

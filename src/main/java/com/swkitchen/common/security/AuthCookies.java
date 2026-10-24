@@ -35,10 +35,10 @@ public class AuthCookies {
         return build(REFRESH_TOKEN, "", REFRESH_PATH, Duration.ZERO);
     }
 
-    private static ResponseCookie build(String name, String value, String path, Duration maxAge) {
+    private ResponseCookie build(String name, String value, String path, Duration maxAge) {
         return ResponseCookie.from(name, value)
             .httpOnly(true)
-            .secure(true)
+            .secure(properties.isCookieSecure())
             .sameSite("Lax")
             .path(path)
             .maxAge(maxAge)
