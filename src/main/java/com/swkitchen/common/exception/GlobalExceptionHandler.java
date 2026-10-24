@@ -28,11 +28,16 @@ public class GlobalExceptionHandler {
         return toResponse(e.getErrorCode(), e.getErrors());
     }
 
-    /** {@code @Valid} 실패. {@code field} 는 요청 본문 경로 그대로 (예: {@code options[1].widthMm}) */
+    /**
+     * {@code @Valid} 실패. {@code field} 는 요청 본문 경로 그대로 (예: {@code options[1].widthMm}).
+     * 쿼리 파라미터 타입이 틀리면 Spring 기본 메시지에 내부 클래스 이름이 들어 있어 바꿔 준다
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
         List<ErrorResponse.FieldError> errors = e.getBindingResult().getFieldErrors().stream()
-            .map(fe -> new ErrorResponse.FieldError(fe.getField(), fe.getDefaultMessage()))
+            .map(fe -> new ErrorResponse.FieldError(
+                fe.getField(),
+                fe.isBindingFailure() ? "값이 올바르지 않습니다." : fe.getDefaultMessage()))
             .toList();
         return toResponse(ErrorCode.VALIDATION_ERROR, errors);
     }

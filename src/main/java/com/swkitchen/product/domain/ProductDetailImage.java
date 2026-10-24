@@ -37,6 +37,7 @@ public class ProductDetailImage {
         image.product = product;
         image.imageKey = imageKey;
         image.sortOrder = sortOrder;
+        product.addDetailImage(image);
         return image;
     }
 }

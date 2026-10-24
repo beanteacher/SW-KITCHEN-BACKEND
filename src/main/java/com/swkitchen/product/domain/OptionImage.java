@@ -37,6 +37,7 @@ public class OptionImage {
         image.productOption = productOption;
         image.imageKey = imageKey;
         image.sortOrder = sortOrder;
+        productOption.addImage(image);
         return image;
     }
 }

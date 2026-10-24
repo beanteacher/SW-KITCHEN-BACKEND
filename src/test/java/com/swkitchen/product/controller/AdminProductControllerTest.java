@@ -93,6 +93,64 @@ class AdminProductControllerTest {
     }
 
     @Test
+    @DisplayName("관리 목록: 신규 등록순 페이지로 주고, 재고품은 옵션별 재고·잡아 둔·보이는 수량을, 신제품은 null 을 준다")
+    void search() throws Exception {
+        create("""
+            { "categoryId": %d, "name": "업소용 냉장고", "salesType": "NEW", "manufacturer": "우성", "origin": "국산",
+              "options": [ { "modelName": "WSM-1243RF", "widthMm": 1200, "depthMm": 600, "heightMm": 800,
+                             "listPrice": 10000, "discountType": "NONE", "mainImageKey": "%s" } ] }
+            """.formatted(fridge.getId(), KEY1))
+            .andExpect(status().isCreated());
+        create("""
+            { "categoryId": %d, "name": "재고 냉장고", "salesType": "STOCK", "manufacturer": "우성", "origin": "국산",
+              "options": [ { "widthMm": 1200, "depthMm": 600, "heightMm": 800, "listPrice": 10000,
+                             "discountType": "RATE", "discountValue": 10, "stockQty": 3, "mainImageKey": "%s" } ] }
+            """.formatted(fridge.getId(), KEY1))
+            .andExpect(status().isCreated());
+
+        search("categoryId=" + fridge.getId() + "&size=1")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.size").value(1))
+            .andExpect(jsonPath("$.data.totalElements").value(2))
+            .andExpect(jsonPath("$.data.totalPages").value(2))
+            .andExpect(jsonPath("$.data.content[0].name").value("재고 냉장고"))
+            .andExpect(jsonPath("$.data.content[0].categoryName").value("냉장·냉동 > 업소용 냉장고"))
+            .andExpect(jsonPath("$.data.content[0].manufacturer").value("우성"))
+            .andExpect(jsonPath("$.data.content[0].options[0].productCode").value("RFUR-00002-01"))
+            .andExpect(jsonPath("$.data.content[0].options[0].salePrice").value(9_000))
+            .andExpect(jsonPath("$.data.content[0].options[0].stockQty").value(3))
+            .andExpect(jsonPath("$.data.content[0].options[0].reservedQty").value(0))
+            .andExpect(jsonPath("$.data.content[0].options[0].visibleQty").value(3));
+        search("categoryId=" + fridge.getId() + "&size=1&page=2")
+            .andExpect(jsonPath("$.data.page").value(2))
+            .andExpect(jsonPath("$.data.content[0].name").value("업소용 냉장고"))
+            .andExpect(jsonPath("$.data.content[0].options[0].modelName").value("WSM-1243RF"))
+            .andExpect(jsonPath("$.data.content[0].options[0].stockQty").doesNotExist())
+            .andExpect(jsonPath("$.data.content[0].options[0].visibleQty").doesNotExist());
+        mvc.perform(get("/api/v1/admin/product").cookie(accessToken(Role.STAFF))
+                .param("categoryId", fridge.getId().toString())
+                .param("keyword", "  1243rf ")
+                .param("salesType", "NEW", "USED"))
+            .andExpect(jsonPath("$.data.totalElements").value(1))
+            .andExpect(jsonPath("$.data.content[0].name").value("업소용 냉장고"));
+    }
+
+    @Test
+    @DisplayName("관리 목록: 없는 판매 구분·50자 넘는 검색어는 400, 고객은 403 이다")
+    void searchErrors() throws Exception {
+        search("salesType=RENTAL")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("salesType"))
+            .andExpect(jsonPath("$.errors[0].message").value("값이 올바르지 않습니다."));
+        search("keyword=" + "가".repeat(51))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("keyword"));
+        mvc.perform(get("/api/v1/admin/product").cookie(accessToken(Role.CUSTOMER)))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("입력 오류: 400 과 함께 옵션·칸 경로로 항목별 오류를 한 번에 준다")
     void validationErrors() throws Exception {
         String body = """
@@ -201,6 +259,10 @@ class AdminProductControllerTest {
     private ResultActions create(String body) throws Exception {
         return mvc.perform(post("/api/v1/admin/product").cookie(accessToken(Role.STAFF))
             .contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    private ResultActions search(String query) throws Exception {
+        return mvc.perform(get("/api/v1/admin/product?" + query).cookie(accessToken(Role.STAFF)));
     }
 
     private ResultActions update(int id, String body) throws Exception {

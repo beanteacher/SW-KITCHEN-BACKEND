@@ -4,9 +4,11 @@ import com.swkitchen.category.domain.Category;
 import com.swkitchen.category.repository.CategoryRepository;
 import com.swkitchen.common.config.ImageProperties;
 import com.swkitchen.common.dto.ErrorResponse;
+import com.swkitchen.common.dto.PageResponse;
 import com.swkitchen.common.exception.AppException;
 import com.swkitchen.common.exception.ErrorCode;
 import com.swkitchen.product.domain.Dimensions;
+import com.swkitchen.product.domain.Material;
 import com.swkitchen.product.domain.OptionImage;
 import com.swkitchen.product.domain.Product;
 import com.swkitchen.product.domain.ProductCodeSequence;
@@ -24,6 +26,7 @@ import com.swkitchen.product.repository.ProductOptionRepository;
 import com.swkitchen.product.repository.ProductRepository;
 import com.swkitchen.product.repository.ProductSpecRepository;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +36,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,7 +68,60 @@ public class ProductService {
     public ProductDto.AdminResponse getAdmin(Long id) {
         Product product = productRepository.findById(id)
             .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
-        return toAdminResponse(product);
+        return ProductDto.AdminResponse.of(product, imageProperties::urlOf);
+    }
+
+    /** 고객 목록·검색 한 페이지. 옵션은 그 페이지 제품 것을 Hibernate 가 IN 쿼리 한 번으로 읽는다 */
+    @Transactional(readOnly = true)
+    public PageResponse<ProductDto.SummaryResponse> search(ProductDto.SearchRequest request, Pageable pageable) {
+        Page<Product> products = productRepository.search(request, pageable);
+
+        return PageResponse.from(products.map(product -> ProductDto.SummaryResponse.of(product, imageProperties::urlOf)));
+    }
+
+    /** 고객 목록 필터 패널. 분류 트리·판매 구분·재질에 줄마다 개수를 붙인다. 정렬·페이지와 관계없다 */
+    @Transactional(readOnly = true)
+    public ProductDto.FilterResponse getFilter(ProductDto.SearchRequest request) {
+        // 중분류 id → 제품 수. 제품이 없는 줄은 없다
+        Map<Long, Long> categoryCounts = productRepository.countOnSaleByCategory(request).stream()
+            .collect(Collectors.toMap(
+                ProductDto.CategoryProductCount::categoryId,
+                ProductDto.CategoryProductCount::productCount));
+        Map<SalesType, Long> salesTypeCounts = productRepository.countOnSaleBySalesType(request).stream()
+            .collect(Collectors.toMap(ProductDto.SalesTypeCount::salesType, ProductDto.SalesTypeCount::productCount));
+        Map<Material, Long> materialCounts = productRepository.countOnSaleByMaterial(request).stream()
+            .collect(Collectors.toMap(ProductDto.MaterialCount::material, ProductDto.MaterialCount::productCount));
+
+        List<ProductDto.FilterCategoryResponse> categories = categoryRepository.findByParentIsNullOrderBySortOrderAscIdAsc()
+            .stream()
+            .map(parent -> toFilterCategory(parent, categoryCounts))
+            .toList();
+        long total = categories.stream().mapToLong(ProductDto.FilterCategoryResponse::productCount).sum();
+        List<ProductDto.SalesTypeFilterResponse> salesTypes = Arrays.stream(SalesType.values())
+            .map(salesType -> new ProductDto.SalesTypeFilterResponse(salesType, salesTypeCounts.getOrDefault(salesType, 0L)))
+            .toList();
+        List<ProductDto.MaterialFilterResponse> materials = Arrays.stream(Material.values())
+            .map(material -> new ProductDto.MaterialFilterResponse(material, materialCounts.getOrDefault(material, 0L)))
+            .toList();
+
+        return new ProductDto.FilterResponse(total, categories, salesTypes, materials);
+    }
+
+    /** 고객 상세. 보이는 수량이 0 인 재고품·중고품도 목록에서만 빠지고 상세는 열린다 (DEC-076) */
+    @Transactional(readOnly = true)
+    public ProductDto.DetailResponse get(Long id) {
+        Product product = productRepository.findById(id)
+            .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        return ProductDto.DetailResponse.of(product, imageProperties::urlOf);
+    }
+
+    /** 관리 목록 한 페이지. 옵션은 그 페이지 제품 것을 Hibernate 가 IN 쿼리 한 번으로 읽는다 */
+    @Transactional(readOnly = true)
+    public PageResponse<ProductDto.AdminSummaryResponse> searchAdmin(ProductDto.AdminSearchRequest request, Pageable pageable) {
+        Page<Product> products = productRepository.searchAdmin(request, pageable);
+
+        return PageResponse.from(products.map(ProductDto.AdminSummaryResponse::from));
     }
 
     /** 제품을 새로 등록한다. 상품 코드 앞자리(예: RFUR-00001)를 발급하고 옵션마다 -01, -02 ... 를 붙인다 */
@@ -92,7 +150,7 @@ public class ProductService {
         }
         saveSpecsAndImages(product, request);
 
-        return toAdminResponse(product);
+        return ProductDto.AdminResponse.of(product, imageProperties::urlOf);
     }
 
     /**
@@ -105,7 +163,8 @@ public class ProductService {
         Category category = findMiddleCategory(request.categoryId());
         checkDuplicates(request);
 
-        List<ProductOption> existing = productOptionRepository.findByProductIdOrderByOptionNo(id);
+        // 지운 옵션은 제품 목록에서도 빠지므로, 검사·삭제에 쓸 기존 옵션은 복사해 둔다
+        List<ProductOption> existing = List.copyOf(product.getOptions());
         Map<Long, ProductOption> kept = checkKeptOptions(existing, request.options());
         List<ProductOption> removed = checkRemovableOptions(existing, kept.keySet());
         checkSalesTypeChange(product.getSalesType(), request.salesType(), existing);
@@ -122,12 +181,12 @@ public class ProductService {
             request.origin(),
             request.description());
         product.changeMaterials(request.materials() == null ? List.of() : request.materials());
-        deleteReplacedRows(id, existing, removed);
+        deleteReplacedRows(product, existing, removed);
         changeKeptOptions(kept, request);
         createNewOptions(product, request);
         saveSpecsAndImages(product, request);
 
-        return toAdminResponse(product);
+        return ProductDto.AdminResponse.of(product, imageProperties::urlOf);
     }
 
     /**
@@ -185,13 +244,20 @@ public class ProductService {
      * 옵션 이미지·사양·제품 이미지는 통째로 지우고 뒤에서 다시 넣는다. 빠진 옵션도 여기서 지운다.
      * 새로 넣는 행과 지울 행이 같은 치수·이름일 수 있어 지우기는 바로 실행한다
      */
-    private void deleteReplacedRows(Long productId, List<ProductOption> existing, List<ProductOption> removed) {
-        List<Long> existingIds = existing.stream().map(ProductOption::getId).toList();
-        optionImageRepository.deleteAllInBatch(optionImageRepository.findByProductOptionIdInOrderBySortOrder(existingIds));
+    private void deleteReplacedRows(Product product, List<ProductOption> existing, List<ProductOption> removed) {
+        List<OptionImage> optionImages = existing.stream()
+            .flatMap(option -> option.getImages().stream())
+            .toList();
+        optionImageRepository.deleteAllInBatch(optionImages);
+        existing.forEach(ProductOption::clearImages);
+
         productOptionRepository.deleteAllInBatch(removed);
-        productSpecRepository.deleteAllInBatch(productSpecRepository.findByProductIdOrderBySortOrder(productId));
-        productImageRepository.deleteAllInBatch(productImageRepository.findByProductIdOrderBySortOrder(productId));
-        productDetailImageRepository.deleteAllInBatch(productDetailImageRepository.findByProductIdOrderBySortOrder(productId));
+        product.removeOptions(removed);
+
+        productSpecRepository.deleteAllInBatch(product.getSpecs());
+        productImageRepository.deleteAllInBatch(product.getImages());
+        productDetailImageRepository.deleteAllInBatch(product.getDetailImages());
+        product.clearSpecsAndImages();
     }
 
     /** 남은 기존 옵션을 고치고 그 이미지를 다시 넣는다 */
@@ -223,28 +289,15 @@ public class ProductService {
         }
     }
 
-    /** 저장된 사양·이미지·옵션을 다시 읽어 화면용 응답으로 넘긴다. 응답 모양은 DTO 가 만든다 */
-    private ProductDto.AdminResponse toAdminResponse(Product product) {
-        Long productId = product.getId();
-        List<ProductSpec> specs = productSpecRepository.findByProductIdOrderBySortOrder(productId);
-        List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(productId);
-        List<ProductDetailImage> detailImages = productDetailImageRepository.findByProductIdOrderBySortOrder(productId);
-        List<ProductOption> options = productOptionRepository.findByProductIdOrderByOptionNo(productId);
+    private static ProductDto.FilterCategoryResponse toFilterCategory(Category parent, Map<Long, Long> categoryCounts) {
+        List<ProductDto.FilterCategoryResponse> children = parent.getChildren().stream()
+            .map(child -> ProductDto.FilterCategoryResponse.of(
+                child,
+                categoryCounts.getOrDefault(child.getId(), 0L),
+                List.of()))
+            .toList();
 
-        // 옵션 이미지는 옵션마다 따로 읽지 않고 한 번에 읽어 옵션 id 별로 나눈다
-        List<Long> optionIds = options.stream().map(ProductOption::getId).toList();
-        Map<Long, List<OptionImage>> optionImages = optionImageRepository
-            .findByProductOptionIdInOrderBySortOrder(optionIds).stream()
-            .collect(Collectors.groupingBy(image -> image.getProductOption().getId()));
-
-        return ProductDto.AdminResponse.of(
-            product,
-            specs,
-            images,
-            detailImages,
-            options,
-            optionImages,
-            imageProperties::urlOf);
+        return ProductDto.FilterCategoryResponse.of(parent, 0, children);
     }
 
     /** 옵션 하나를 다음 번호로 만들고 그 이미지까지 저장한다 */

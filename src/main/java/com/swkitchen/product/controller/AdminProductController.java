@@ -1,10 +1,12 @@
 package com.swkitchen.product.controller;
 
 import com.swkitchen.common.dto.ApiResponse;
+import com.swkitchen.common.dto.PageResponse;
 import com.swkitchen.product.dto.ProductDto;
 import com.swkitchen.product.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminProductController {
 
     private final ProductService productService;
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<ProductDto.AdminSummaryResponse>>> search(
+            @Valid ProductDto.AdminSearchRequest request,
+            Pageable pageable) {
+        PageResponse<ProductDto.AdminSummaryResponse> products = productService.searchAdmin(request, pageable);
+
+        return ResponseEntity.ok(ApiResponse.success(products));
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductDto.AdminResponse>> get(@PathVariable Long id) {

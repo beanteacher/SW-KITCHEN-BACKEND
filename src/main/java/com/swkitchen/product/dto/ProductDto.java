@@ -4,11 +4,8 @@ import com.swkitchen.category.domain.Category;
 import com.swkitchen.product.domain.Dimensions;
 import com.swkitchen.product.domain.DiscountType;
 import com.swkitchen.product.domain.Material;
-import com.swkitchen.product.domain.OptionImage;
 import com.swkitchen.product.domain.Price;
 import com.swkitchen.product.domain.Product;
-import com.swkitchen.product.domain.ProductDetailImage;
-import com.swkitchen.product.domain.ProductImage;
 import com.swkitchen.product.domain.ProductOption;
 import com.swkitchen.product.domain.ProductSpec;
 import com.swkitchen.product.domain.SalesType;
@@ -18,8 +15,8 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.function.UnaryOperator;
 import org.hibernate.validator.constraints.Range;
 
@@ -99,33 +96,23 @@ public class ProductDto {
             List<ImageResponse> detailImages,
             List<AdminOptionResponse> options) {
 
-        /** 옵션 이미지는 옵션 id 별로 묶어 받는다. urlOf 는 이미지 키에 저장소 주소를 붙인다 */
-        public static AdminResponse of(
-                Product product,
-                List<ProductSpec> specs,
-                List<ProductImage> images,
-                List<ProductDetailImage> detailImages,
-                List<ProductOption> options,
-                Map<Long, List<OptionImage>> optionImages,
-                UnaryOperator<String> urlOf) {
+        /** urlOf 는 이미지 키에 저장소 주소를 붙인다 */
+        public static AdminResponse of(Product product, UnaryOperator<String> urlOf) {
             List<MaterialResponse> materialResponses = product.getMaterials().stream()
                 .sorted()
                 .map(MaterialResponse::from)
                 .toList();
-            List<SpecResponse> specResponses = specs.stream()
+            List<SpecResponse> specResponses = product.getSpecs().stream()
                 .map(SpecResponse::from)
                 .toList();
-            List<ImageResponse> imageResponses = images.stream()
+            List<ImageResponse> imageResponses = product.getImages().stream()
                 .map(image -> ImageResponse.of(image.getImageKey(), urlOf))
                 .toList();
-            List<ImageResponse> detailImageResponses = detailImages.stream()
+            List<ImageResponse> detailImageResponses = product.getDetailImages().stream()
                 .map(image -> ImageResponse.of(image.getImageKey(), urlOf))
                 .toList();
-            List<AdminOptionResponse> optionResponses = options.stream()
-                .map(option -> AdminOptionResponse.of(
-                    option,
-                    optionImages.getOrDefault(option.getId(), List.of()),
-                    urlOf))
+            List<AdminOptionResponse> optionResponses = product.getOptions().stream()
+                .map(option -> AdminOptionResponse.of(option, urlOf))
                 .toList();
 
             return new AdminResponse(
@@ -141,6 +128,266 @@ public class ProductDto {
                 imageResponses,
                 detailImageResponses,
                 optionResponses);
+        }
+    }
+
+    // 고객 목록·검색 조건 (SCR-001~003). 모두 비우면 전체 제품이다. 검색어는 앞뒤 공백을 지우고, 비면 조건에서 뺀다
+    public record SearchRequest(
+            List<SalesType> salesType,
+            Long categoryId,
+            List<Material> materials,
+            @Size(max = 50, message = "검색어는 50자 이하입니다.") String keyword,
+            OrderBy orderBy) {
+
+        public SearchRequest {
+            keyword = keyword == null || keyword.isBlank() ? null : keyword.strip();
+            orderBy = orderBy == null ? OrderBy.POPULAR : orderBy;
+        }
+
+        // 필터 줄 옆 개수는 그 줄의 조건만 빼고 센다
+        public SearchRequest withoutCategory() {
+            return new SearchRequest(salesType, null, materials, keyword, orderBy);
+        }
+
+        public SearchRequest withoutSalesType() {
+            return new SearchRequest(null, categoryId, materials, keyword, orderBy);
+        }
+
+        public SearchRequest withoutMaterials() {
+            return new SearchRequest(salesType, categoryId, null, keyword, orderBy);
+        }
+    }
+
+    // 고객 목록 필터 패널 (C5 3.2). 줄마다 그 줄만 바꿔 골랐을 때의 제품 수이고, 다른 구역의 조건은 그대로 둔다
+    // total 은 분류 [전체] 줄. 분류는 백오피스에서 정한 순서, 판매 구분·재질은 enum 순서로 0 인 줄까지 모두 준다
+    public record FilterResponse(
+            long total,
+            List<FilterCategoryResponse> categories,
+            List<SalesTypeFilterResponse> salesTypes,
+            List<MaterialFilterResponse> materials) {
+    }
+
+    // 대분류의 개수는 아래 중분류 합이다. 제품은 중분류에만 있다
+    public record FilterCategoryResponse(
+            Long id,
+            String name,
+            long productCount,
+            List<FilterCategoryResponse> children) {
+
+        public static FilterCategoryResponse of(Category category, long ownProductCount, List<FilterCategoryResponse> children) {
+            long count = ownProductCount + children.stream().mapToLong(FilterCategoryResponse::productCount).sum();
+            return new FilterCategoryResponse(category.getId(), category.getName(), count, children);
+        }
+    }
+
+    public record SalesTypeFilterResponse(SalesType code, long productCount) {
+    }
+
+    // 재질의 한글 이름은 프론트가 선언해 쓴다 (DEC-106)
+    public record MaterialFilterResponse(Material code, long productCount) {
+    }
+
+    // 같은 값이면 신규 등록순. 인기순은 주문 기능 전까지 신규 등록순과 같다 (C3 4장)
+    public enum OrderBy {
+        POPULAR, NEWEST, PRICE_ASC, PRICE_DESC
+    }
+
+    // 목록 카드 한 장. 대표 이미지는 첫 번째 옵션 것, 가격은 판매가가 가장 낮은 옵션 것(같으면 앞 번호)
+    // 신제품은 visibleQty 가 null
+    public record SummaryResponse(
+            Long id,
+            String name,
+            SalesType salesType,
+            String manufacturer,
+            String mainImageUrl,
+            PriceResponse price,
+            Integer visibleQty) {
+
+        public static SummaryResponse of(Product product, UnaryOperator<String> urlOf) {
+            List<ProductOption> options = product.getOptions();
+            ProductOption cheapest = options.stream()
+                .min(Comparator.comparingInt((ProductOption option) -> option.getPrice().getSalePrice())
+                    .thenComparingInt(ProductOption::getOptionNo))
+                .orElseThrow();
+            boolean varies = options.stream()
+                .map(option -> option.getPrice().getSalePrice())
+                .distinct()
+                .count() > 1;
+            Integer visibleQty = product.getSalesType() == SalesType.NEW
+                ? null
+                : options.stream().mapToInt(ProductOption::visibleQty).sum();
+
+            return new SummaryResponse(
+                product.getId(),
+                product.getName(),
+                product.getSalesType(),
+                product.getManufacturer(),
+                urlOf.apply(options.get(0).getMainImageKey()),
+                PriceResponse.of(cheapest.getPrice(), varies),
+                visibleQty);
+        }
+    }
+
+    // varies 는 옵션마다 판매가가 달라 화면이 "~" 를 붙여야 하는지
+    public record PriceResponse(
+            int salePrice,
+            int listPrice,
+            DiscountType discountType,
+            Integer discountValue,
+            boolean varies) {
+
+        public static PriceResponse of(Price price, boolean varies) {
+            return new PriceResponse(
+                price.getSalePrice(),
+                price.getListPrice(),
+                price.getDiscountType(),
+                price.getDiscountValue(),
+                varies);
+        }
+    }
+
+    // 고객용 상세 (SCR-004). 모델명·재고·잡아 둔 수량은 넣지 않고 보이는 수량만 준다
+    public record DetailResponse(
+            Long id,
+            String name,
+            SalesType salesType,
+            CategoryRef category,
+            String manufacturer,
+            String origin,
+            List<MaterialResponse> materials,
+            List<SpecResponse> specs,
+            String description,
+            List<String> imageUrls,
+            List<String> detailImageUrls,
+            List<OptionResponse> options) {
+
+        public static DetailResponse of(Product product, UnaryOperator<String> urlOf) {
+            List<MaterialResponse> materialResponses = product.getMaterials().stream()
+                .sorted()
+                .map(MaterialResponse::from)
+                .toList();
+            List<SpecResponse> specResponses = product.getSpecs().stream()
+                .map(SpecResponse::from)
+                .toList();
+            List<String> imageUrls = product.getImages().stream()
+                .map(image -> urlOf.apply(image.getImageKey()))
+                .toList();
+            List<String> detailImageUrls = product.getDetailImages().stream()
+                .map(image -> urlOf.apply(image.getImageKey()))
+                .toList();
+            List<OptionResponse> optionResponses = product.getOptions().stream()
+                .map(option -> OptionResponse.of(option, urlOf))
+                .toList();
+
+            return new DetailResponse(
+                product.getId(),
+                product.getName(),
+                product.getSalesType(),
+                CategoryRef.from(product.getCategory()),
+                product.getManufacturer(),
+                product.getOrigin(),
+                materialResponses,
+                specResponses,
+                product.getDescription(),
+                imageUrls,
+                detailImageUrls,
+                optionResponses);
+        }
+    }
+
+    // 보이는 수량이 0 인 옵션도 준다. 화면이 품절로 보여준다. 신제품은 visibleQty 가 null
+    public record OptionResponse(
+            Long id,
+            String productCode,
+            int widthMm,
+            int depthMm,
+            int heightMm,
+            int listPrice,
+            DiscountType discountType,
+            Integer discountValue,
+            int salePrice,
+            Integer visibleQty,
+            String mainImageUrl,
+            List<String> imageUrls) {
+
+        public static OptionResponse of(ProductOption option, UnaryOperator<String> urlOf) {
+            Dimensions dimensions = option.getDimensions();
+            Price price = option.getPrice();
+            List<String> imageUrls = option.getImages().stream()
+                .map(image -> urlOf.apply(image.getImageKey()))
+                .toList();
+
+            return new OptionResponse(
+                option.getId(),
+                option.getProductCode(),
+                dimensions.widthMm(),
+                dimensions.depthMm(),
+                dimensions.heightMm(),
+                price.getListPrice(),
+                price.getDiscountType(),
+                price.getDiscountValue(),
+                price.getSalePrice(),
+                option.visibleQty(),
+                urlOf.apply(option.getMainImageKey()),
+                imageUrls);
+        }
+    }
+
+    // 관리 목록 검색 조건. 모두 비우면 전체 제품이다. 검색어는 앞뒤 공백을 지우고, 비면 조건에서 뺀다
+    public record AdminSearchRequest(
+            @Size(max = 50, message = "검색어는 50자 이하입니다.") String keyword,
+            Long categoryId,
+            List<SalesType> salesType) {
+
+        public AdminSearchRequest {
+            keyword = keyword == null || keyword.isBlank() ? null : keyword.strip();
+        }
+    }
+
+    // 관리 목록 한 줄. categoryName 은 "대분류 > 중분류"
+    public record AdminSummaryResponse(
+            Long id,
+            String name,
+            SalesType salesType,
+            String categoryName,
+            String manufacturer,
+            List<AdminSummaryOptionResponse> options) {
+
+        public static AdminSummaryResponse from(Product product) {
+            Category category = product.getCategory();
+            List<AdminSummaryOptionResponse> optionResponses = product.getOptions().stream()
+                .map(AdminSummaryOptionResponse::from)
+                .toList();
+
+            return new AdminSummaryResponse(
+                product.getId(),
+                product.getName(),
+                product.getSalesType(),
+                category.getParent().getName() + " > " + category.getName(),
+                product.getManufacturer(),
+                optionResponses);
+        }
+    }
+
+    // 신제품은 stockQty·visibleQty 가 null
+    public record AdminSummaryOptionResponse(
+            Long id,
+            String productCode,
+            String modelName,
+            int salePrice,
+            Integer stockQty,
+            int reservedQty,
+            Integer visibleQty) {
+
+        public static AdminSummaryOptionResponse from(ProductOption option) {
+            return new AdminSummaryOptionResponse(
+                option.getId(),
+                option.getProductCode(),
+                option.getModelName(),
+                option.getPrice().getSalePrice(),
+                option.getStockQty(),
+                option.getReservedQty(),
+                option.visibleQty());
         }
     }
 
@@ -192,13 +439,10 @@ public class ProductDto {
             ImageResponse mainImage,
             List<ImageResponse> images) {
 
-        public static AdminOptionResponse of(
-                ProductOption option,
-                List<OptionImage> images,
-                UnaryOperator<String> urlOf) {
+        public static AdminOptionResponse of(ProductOption option, UnaryOperator<String> urlOf) {
             Dimensions dimensions = option.getDimensions();
             Price price = option.getPrice();
-            List<ImageResponse> imageResponses = images.stream()
+            List<ImageResponse> imageResponses = option.getImages().stream()
                 .map(image -> ImageResponse.of(image.getImageKey(), urlOf))
                 .toList();
 
@@ -224,5 +468,11 @@ public class ProductDto {
     // ── 저장소 → 서비스 (조회 결과) ──
 
     public record CategoryProductCount(Long categoryId, long productCount) {
+    }
+
+    public record SalesTypeCount(SalesType salesType, long productCount) {
+    }
+
+    public record MaterialCount(Material material, long productCount) {
     }
 }
