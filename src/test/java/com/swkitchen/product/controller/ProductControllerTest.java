@@ -176,7 +176,7 @@ class ProductControllerTest {
             .andExpect(jsonPath("$.data.options[0].stockQty").doesNotExist())
             .andExpect(jsonPath("$.data.options[0].reservedQty").doesNotExist());
 
-        // 보이는 수량이 0 이라 목록에는 없다 (DEC-076)
+        // 보이는 수량이 0 이라 목록에는 없다
         mvc.perform(get("/api/v1/product"))
             .andExpect(jsonPath("$.data.totalElements").value(0));
 
