@@ -46,3 +46,7 @@ management:
     web:
       exposure:
         include: health
+# 쿼리 로그(p6spy)는 기본으로 끈다. 로컬만 켠다
+decorator:
+  datasource:
+    enabled: false

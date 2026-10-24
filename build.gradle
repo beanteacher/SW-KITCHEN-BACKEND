@@ -46,6 +46,8 @@ dependencies {
     runtimeOnly 'com.mysql:mysql-connector-j'
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-mysql'
+    // 실행하는 쿼리를 ? 대신 실제 값을 넣어 로그로 찍는다. 로컬에서만 켠다 (application-local.yml)
+    implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.12.1'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'

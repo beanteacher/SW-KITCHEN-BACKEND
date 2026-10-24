@@ -5,6 +5,11 @@ spring:
     username: sw_kitchen
     password: sw_kitchen
 
+# 실행하는 쿼리를 ? 대신 들어간 값으로 채워 한 줄로 찍는다
+decorator:
+  datasource:
+    enabled: true
+
 security:
   # Safari 는 http://localhost 에서 Secure 쿠키를 저장하지 않는다. 운영(https)은 기본값(켬)을 쓴다
   cookie-secure: false
