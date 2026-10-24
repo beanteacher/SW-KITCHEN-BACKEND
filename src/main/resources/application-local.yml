@@ -6,6 +6,8 @@ spring:
     password: sw_kitchen
 
 security:
+  # Safari 는 http://localhost 에서 Secure 쿠키를 저장하지 않는다. 운영(https)은 기본값(켬)을 쓴다
+  cookie-secure: false
   jwt:
     secret: local-only-secret-change-me-0123456789abcdef   # 32바이트 이상
   # 계정이 하나도 없을 때만 만든다
