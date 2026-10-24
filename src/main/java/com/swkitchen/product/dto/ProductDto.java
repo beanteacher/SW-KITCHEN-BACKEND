@@ -131,7 +131,7 @@ public class ProductDto {
         }
     }
 
-    // 고객 목록·검색 조건 (SCR-001~003). 모두 비우면 전체 제품이다. 검색어는 앞뒤 공백을 지우고, 비면 조건에서 뺀다
+    // 고객 목록·검색 조건. 모두 비우면 전체 제품이다. 검색어는 앞뒤 공백을 지우고, 비면 조건에서 뺀다
     public record SearchRequest(
             List<SalesType> salesType,
             Long categoryId,
@@ -158,7 +158,7 @@ public class ProductDto {
         }
     }
 
-    // 고객 목록 필터 패널 (C5 3.2). 줄마다 그 줄만 바꿔 골랐을 때의 제품 수이고, 다른 구역의 조건은 그대로 둔다
+    // 고객 목록 필터 패널. 줄마다 그 줄만 바꿔 골랐을 때의 제품 수이고, 다른 구역의 조건은 그대로 둔다
     // total 은 분류 [전체] 줄. 분류는 백오피스에서 정한 순서, 판매 구분·재질은 enum 순서로 0 인 줄까지 모두 준다
     public record FilterResponse(
             long total,
@@ -183,11 +183,11 @@ public class ProductDto {
     public record SalesTypeFilterResponse(SalesType code, long productCount) {
     }
 
-    // 재질의 한글 이름은 프론트가 선언해 쓴다 (DEC-106)
+    // 재질의 한글 이름은 프론트가 선언해 쓴다
     public record MaterialFilterResponse(Material code, long productCount) {
     }
 
-    // 같은 값이면 신규 등록순. 인기순은 주문 기능 전까지 신규 등록순과 같다 (C3 4장)
+    // 같은 값이면 신규 등록순. 인기순은 주문 기능 전까지 신규 등록순과 같다
     public enum OrderBy {
         POPULAR, NEWEST, PRICE_ASC, PRICE_DESC
     }
@@ -246,7 +246,7 @@ public class ProductDto {
         }
     }
 
-    // 고객용 상세 (SCR-004). 모델명·재고·잡아 둔 수량은 넣지 않고 보이는 수량만 준다
+    // 고객용 상세. 모델명·재고·잡아 둔 수량은 넣지 않고 보이는 수량만 준다
     public record DetailResponse(
             Long id,
             String name,

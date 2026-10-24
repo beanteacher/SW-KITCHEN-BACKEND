@@ -42,7 +42,7 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
             .fetch();
     }
 
-    /** 고객 목록·검색. 재고품·중고품은 보이는 수량이 남은 제품만 나온다 (REQ-008) */
+    /** 고객 목록·검색. 재고품·중고품은 보이는 수량이 남은 제품만 나온다 */
     @Override
     public Page<Product> search(ProductDto.SearchRequest request, Pageable pageable) {
         BooleanExpression[] conditions = onSaleConditions(request);
@@ -148,7 +148,7 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
             .or(optionExists(productOption.stockQty.subtract(productOption.reservedQty).goe(1)));
     }
 
-    /** 제품명·제조사, 옵션의 상품 코드. 제조사 모델명은 고객에게 보이지 않아 찾지 않는다 (REQ-003) */
+    /** 제품명·제조사, 옵션의 상품 코드. 제조사 모델명은 고객에게 보이지 않아 찾지 않는다 */
     private static BooleanExpression keywordMatches(String keyword) {
         if (keyword == null) {
             return null;
@@ -161,7 +161,7 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
         return codeLike == null ? matches : matches.or(optionExists(codeLike));
     }
 
-    /** 고른 재질 중 하나라도 가진 제품 (REQ-010) */
+    /** 고른 재질 중 하나라도 가진 제품 */
     private static BooleanExpression hasAnyMaterial(List<Material> materials) {
         if (materials == null || materials.isEmpty()) {
             return null;

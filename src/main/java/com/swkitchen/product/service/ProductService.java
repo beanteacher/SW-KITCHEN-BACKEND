@@ -107,7 +107,7 @@ public class ProductService {
         return new ProductDto.FilterResponse(total, categories, salesTypes, materials);
     }
 
-    /** 고객 상세. 보이는 수량이 0 인 재고품·중고품도 목록에서만 빠지고 상세는 열린다 (DEC-076) */
+    /** 고객 상세. 보이는 수량이 0 인 재고품·중고품도 목록에서만 빠지고 상세는 열린다 */
     @Transactional(readOnly = true)
     public ProductDto.DetailResponse get(Long id) {
         Product product = productRepository.findById(id)
