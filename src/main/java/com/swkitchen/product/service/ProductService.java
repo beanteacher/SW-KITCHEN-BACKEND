@@ -63,7 +63,7 @@ public class ProductService {
     public ProductDto.AdminResponse getAdmin(Long id) {
         Product product = productRepository.findById(id)
             .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
-        return toAdminResponse(product);
+        return ProductDto.AdminResponse.of(product, imageProperties::urlOf);
     }
 
     /** 제품을 새로 등록한다. 상품 코드 앞자리(예: RFUR-00001)를 발급하고 옵션마다 -01, -02 ... 를 붙인다 */
@@ -92,7 +92,7 @@ public class ProductService {
         }
         saveSpecsAndImages(product, request);
 
-        return toAdminResponse(product);
+        return ProductDto.AdminResponse.of(product, imageProperties::urlOf);
     }
 
     /**
@@ -105,7 +105,8 @@ public class ProductService {
         Category category = findMiddleCategory(request.categoryId());
         checkDuplicates(request);
 
-        List<ProductOption> existing = productOptionRepository.findByProductIdOrderByOptionNo(id);
+        // 지운 옵션은 제품 목록에서도 빠지므로, 검사·삭제에 쓸 기존 옵션은 복사해 둔다
+        List<ProductOption> existing = List.copyOf(product.getOptions());
         Map<Long, ProductOption> kept = checkKeptOptions(existing, request.options());
         List<ProductOption> removed = checkRemovableOptions(existing, kept.keySet());
         checkSalesTypeChange(product.getSalesType(), request.salesType(), existing);
@@ -122,12 +123,12 @@ public class ProductService {
             request.origin(),
             request.description());
         product.changeMaterials(request.materials() == null ? List.of() : request.materials());
-        deleteReplacedRows(id, existing, removed);
+        deleteReplacedRows(product, existing, removed);
         changeKeptOptions(kept, request);
         createNewOptions(product, request);
         saveSpecsAndImages(product, request);
 
-        return toAdminResponse(product);
+        return ProductDto.AdminResponse.of(product, imageProperties::urlOf);
     }
 
     /**
@@ -185,13 +186,20 @@ public class ProductService {
      * 옵션 이미지·사양·제품 이미지는 통째로 지우고 뒤에서 다시 넣는다. 빠진 옵션도 여기서 지운다.
      * 새로 넣는 행과 지울 행이 같은 치수·이름일 수 있어 지우기는 바로 실행한다
      */
-    private void deleteReplacedRows(Long productId, List<ProductOption> existing, List<ProductOption> removed) {
-        List<Long> existingIds = existing.stream().map(ProductOption::getId).toList();
-        optionImageRepository.deleteAllInBatch(optionImageRepository.findByProductOptionIdInOrderBySortOrder(existingIds));
+    private void deleteReplacedRows(Product product, List<ProductOption> existing, List<ProductOption> removed) {
+        List<OptionImage> optionImages = existing.stream()
+            .flatMap(option -> option.getImages().stream())
+            .toList();
+        optionImageRepository.deleteAllInBatch(optionImages);
+        existing.forEach(ProductOption::clearImages);
+
         productOptionRepository.deleteAllInBatch(removed);
-        productSpecRepository.deleteAllInBatch(productSpecRepository.findByProductIdOrderBySortOrder(productId));
-        productImageRepository.deleteAllInBatch(productImageRepository.findByProductIdOrderBySortOrder(productId));
-        productDetailImageRepository.deleteAllInBatch(productDetailImageRepository.findByProductIdOrderBySortOrder(productId));
+        product.removeOptions(removed);
+
+        productSpecRepository.deleteAllInBatch(product.getSpecs());
+        productImageRepository.deleteAllInBatch(product.getImages());
+        productDetailImageRepository.deleteAllInBatch(product.getDetailImages());
+        product.clearSpecsAndImages();
     }
 
     /** 남은 기존 옵션을 고치고 그 이미지를 다시 넣는다 */
@@ -221,30 +229,6 @@ public class ProductService {
                 createOption(product, request.salesType(), req);
             }
         }
-    }
-
-    /** 저장된 사양·이미지·옵션을 다시 읽어 화면용 응답으로 넘긴다. 응답 모양은 DTO 가 만든다 */
-    private ProductDto.AdminResponse toAdminResponse(Product product) {
-        Long productId = product.getId();
-        List<ProductSpec> specs = productSpecRepository.findByProductIdOrderBySortOrder(productId);
-        List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(productId);
-        List<ProductDetailImage> detailImages = productDetailImageRepository.findByProductIdOrderBySortOrder(productId);
-        List<ProductOption> options = productOptionRepository.findByProductIdOrderByOptionNo(productId);
-
-        // 옵션 이미지는 옵션마다 따로 읽지 않고 한 번에 읽어 옵션 id 별로 나눈다
-        List<Long> optionIds = options.stream().map(ProductOption::getId).toList();
-        Map<Long, List<OptionImage>> optionImages = optionImageRepository
-            .findByProductOptionIdInOrderBySortOrder(optionIds).stream()
-            .collect(Collectors.groupingBy(image -> image.getProductOption().getId()));
-
-        return ProductDto.AdminResponse.of(
-            product,
-            specs,
-            images,
-            detailImages,
-            options,
-            optionImages,
-            imageProperties::urlOf);
     }
 
     /** 옵션 하나를 다음 번호로 만들고 그 이미지까지 저장한다 */

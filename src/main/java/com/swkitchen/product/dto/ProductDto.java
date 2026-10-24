@@ -4,11 +4,8 @@ import com.swkitchen.category.domain.Category;
 import com.swkitchen.product.domain.Dimensions;
 import com.swkitchen.product.domain.DiscountType;
 import com.swkitchen.product.domain.Material;
-import com.swkitchen.product.domain.OptionImage;
 import com.swkitchen.product.domain.Price;
 import com.swkitchen.product.domain.Product;
-import com.swkitchen.product.domain.ProductDetailImage;
-import com.swkitchen.product.domain.ProductImage;
 import com.swkitchen.product.domain.ProductOption;
 import com.swkitchen.product.domain.ProductSpec;
 import com.swkitchen.product.domain.SalesType;
@@ -19,7 +16,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
-import java.util.Map;
 import java.util.function.UnaryOperator;
 import org.hibernate.validator.constraints.Range;
 
@@ -99,33 +95,23 @@ public class ProductDto {
             List<ImageResponse> detailImages,
             List<AdminOptionResponse> options) {
 
-        /** 옵션 이미지는 옵션 id 별로 묶어 받는다. urlOf 는 이미지 키에 저장소 주소를 붙인다 */
-        public static AdminResponse of(
-                Product product,
-                List<ProductSpec> specs,
-                List<ProductImage> images,
-                List<ProductDetailImage> detailImages,
-                List<ProductOption> options,
-                Map<Long, List<OptionImage>> optionImages,
-                UnaryOperator<String> urlOf) {
+        /** urlOf 는 이미지 키에 저장소 주소를 붙인다 */
+        public static AdminResponse of(Product product, UnaryOperator<String> urlOf) {
             List<MaterialResponse> materialResponses = product.getMaterials().stream()
                 .sorted()
                 .map(MaterialResponse::from)
                 .toList();
-            List<SpecResponse> specResponses = specs.stream()
+            List<SpecResponse> specResponses = product.getSpecs().stream()
                 .map(SpecResponse::from)
                 .toList();
-            List<ImageResponse> imageResponses = images.stream()
+            List<ImageResponse> imageResponses = product.getImages().stream()
                 .map(image -> ImageResponse.of(image.getImageKey(), urlOf))
                 .toList();
-            List<ImageResponse> detailImageResponses = detailImages.stream()
+            List<ImageResponse> detailImageResponses = product.getDetailImages().stream()
                 .map(image -> ImageResponse.of(image.getImageKey(), urlOf))
                 .toList();
-            List<AdminOptionResponse> optionResponses = options.stream()
-                .map(option -> AdminOptionResponse.of(
-                    option,
-                    optionImages.getOrDefault(option.getId(), List.of()),
-                    urlOf))
+            List<AdminOptionResponse> optionResponses = product.getOptions().stream()
+                .map(option -> AdminOptionResponse.of(option, urlOf))
                 .toList();
 
             return new AdminResponse(
@@ -192,13 +178,10 @@ public class ProductDto {
             ImageResponse mainImage,
             List<ImageResponse> images) {
 
-        public static AdminOptionResponse of(
-                ProductOption option,
-                List<OptionImage> images,
-                UnaryOperator<String> urlOf) {
+        public static AdminOptionResponse of(ProductOption option, UnaryOperator<String> urlOf) {
             Dimensions dimensions = option.getDimensions();
             Price price = option.getPrice();
-            List<ImageResponse> imageResponses = images.stream()
+            List<ImageResponse> imageResponses = option.getImages().stream()
                 .map(image -> ImageResponse.of(image.getImageKey(), urlOf))
                 .toList();
 

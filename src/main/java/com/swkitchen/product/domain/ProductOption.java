@@ -9,8 +9,13 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Version;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -59,6 +64,11 @@ public class ProductOption {
     @Column(nullable = false, length = 100)
     private String mainImageKey;
 
+    // 읽기용. 저장·삭제는 OptionImageRepository 로 하고, 이미지가 만들어지고 지워질 때 함께 맞춘다
+    @OneToMany(mappedBy = "productOption")
+    @OrderBy("sortOrder")
+    private List<OptionImage> images = new ArrayList<>();
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -67,7 +77,7 @@ public class ProductOption {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    /** 제품에서 옵션 번호를 하나 발급받는다 */
+    /** 제품에서 옵션 번호를 하나 발급받고 제품의 옵션 목록에 들어간다 */
     public static ProductOption create(
             Product product,
             String modelName,
@@ -80,6 +90,7 @@ public class ProductOption {
         option.optionNo = product.nextOptionNo();
         option.productCode = "%s-%02d".formatted(product.getCodePrefix(), option.optionNo);
         option.change(modelName, dimensions, price, stockQty, mainImageKey);
+        product.addOption(option);
         return option;
     }
 
@@ -90,5 +101,19 @@ public class ProductOption {
         this.price = price;
         this.stockQty = stockQty;
         this.mainImageKey = mainImageKey;
+    }
+
+    public List<OptionImage> getImages() {
+        return Collections.unmodifiableList(images);
+    }
+
+    /** 이미지를 통째로 지울 때 이 목록도 비운다 */
+    public void clearImages() {
+        images.clear();
+    }
+
+    // OptionImage.create 만 부른다
+    void addImage(OptionImage image) {
+        images.add(image);
     }
 }

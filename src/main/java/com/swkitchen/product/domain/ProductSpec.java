@@ -41,6 +41,7 @@ public class ProductSpec {
         spec.name = name;
         spec.value = value;
         spec.sortOrder = sortOrder;
+        product.addSpec(spec);
         return spec;
     }
 }
