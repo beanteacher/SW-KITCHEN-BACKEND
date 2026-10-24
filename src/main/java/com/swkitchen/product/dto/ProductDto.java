@@ -156,6 +156,7 @@ public class ProductDto {
             Long id,
             String name,
             SalesType salesType,
+            String manufacturer,
             String mainImageUrl,
             PriceResponse price,
             Integer visibleQty) {
@@ -178,6 +179,7 @@ public class ProductDto {
                 product.getId(),
                 product.getName(),
                 product.getSalesType(),
+                product.getManufacturer(),
                 urlOf.apply(options.get(0).getMainImageKey()),
                 PriceResponse.of(cheapest.getPrice(), varies),
                 visibleQty);

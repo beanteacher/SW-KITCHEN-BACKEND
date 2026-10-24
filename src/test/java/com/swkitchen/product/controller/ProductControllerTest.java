@@ -73,6 +73,7 @@ class ProductControllerTest {
             .andExpect(jsonPath("$.data.page").value(1))
             .andExpect(jsonPath("$.data.content[0].name").value("스텐 작업대"))
             .andExpect(jsonPath("$.data.content[0].salesType").value("USED"))
+            .andExpect(jsonPath("$.data.content[0].manufacturer").value("대성"))
             .andExpect(jsonPath("$.data.content[0].mainImageUrl").value(URL + KEY1))
             .andExpect(jsonPath("$.data.content[0].price.salePrice").value(5_000))
             .andExpect(jsonPath("$.data.content[0].price.listPrice").value(10_000))
