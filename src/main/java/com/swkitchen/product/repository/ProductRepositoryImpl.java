@@ -8,6 +8,8 @@ import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.EnumPath;
+import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.JPQLSubQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -43,13 +45,7 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
     /** 고객 목록·검색. 재고품·중고품은 보이는 수량이 남은 제품만 나온다 (REQ-008) */
     @Override
     public Page<Product> search(ProductDto.SearchRequest request, Pageable pageable) {
-        BooleanExpression[] conditions = {
-            onSale(),
-            keywordMatches(request.keyword()),
-            inCategory(request.categoryId()),
-            salesTypeIn(request.salesType()),
-            hasAnyMaterial(request.materials())
-        };
+        BooleanExpression[] conditions = onSaleConditions(request);
 
         List<Product> products = queryFactory
             .selectFrom(product)
@@ -67,6 +63,56 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
             .fetchOne();
 
         return new PageImpl<>(products, pageable, total);
+    }
+
+    /** 중분류별 개수. 분류 조건만 빼고 센다 (필터의 분류 줄) */
+    @Override
+    public List<ProductDto.CategoryProductCount> countOnSaleByCategory(ProductDto.SearchRequest request) {
+        return queryFactory
+            .select(Projections.constructor(ProductDto.CategoryProductCount.class, category.id, product.count()))
+            .from(product)
+            .join(product.category, category)
+            .where(onSaleConditions(request.withoutCategory()))
+            .groupBy(category.id)
+            .fetch();
+    }
+
+    /** 대분류별 개수. 제품은 중분류에만 있어 그 부모로 묶는다 */
+    @Override
+    public List<ProductDto.CategoryProductCount> countOnSaleByParentCategory(ProductDto.SearchRequest request) {
+        return queryFactory
+            .select(Projections.constructor(ProductDto.CategoryProductCount.class, category.parent.id, product.count()))
+            .from(product)
+            .join(product.category, category)
+            .where(onSaleConditions(request.withoutCategory()))
+            .groupBy(category.parent.id)
+            .fetch();
+    }
+
+    /** 판매 구분별 개수. 판매 구분 조건만 빼고 센다 */
+    @Override
+    public List<ProductDto.SalesTypeCount> countOnSaleBySalesType(ProductDto.SearchRequest request) {
+        return queryFactory
+            .select(Projections.constructor(ProductDto.SalesTypeCount.class, product.salesType, product.count()))
+            .from(product)
+            .join(product.category, category)
+            .where(onSaleConditions(request.withoutSalesType()))
+            .groupBy(product.salesType)
+            .fetch();
+    }
+
+    /** 재질별 개수. 재질 조건만 빼고 센다. 재질이 여럿인 제품은 재질마다 하나씩 센다 */
+    @Override
+    public List<ProductDto.MaterialCount> countOnSaleByMaterial(ProductDto.SearchRequest request) {
+        EnumPath<Material> material = Expressions.enumPath(Material.class, "material");
+        return queryFactory
+            .select(Projections.constructor(ProductDto.MaterialCount.class, material, product.count()))
+            .from(product)
+            .join(product.category, category)
+            .join(product.materials, material)
+            .where(onSaleConditions(request.withoutMaterials()))
+            .groupBy(material)
+            .fetch();
     }
 
     /** 신규 등록순. 분류(대분류 포함)는 화면에 이름을 보여주려고 함께 읽는다 */
@@ -95,6 +141,17 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
             .fetchOne();
 
         return new PageImpl<>(products, pageable, total);
+    }
+
+    /** 고객 목록 조건. product.category 를 category 로 조인한 쿼리에 건다 */
+    private static BooleanExpression[] onSaleConditions(ProductDto.SearchRequest request) {
+        return new BooleanExpression[] {
+            onSale(),
+            keywordMatches(request.keyword()),
+            inCategory(request.categoryId()),
+            salesTypeIn(request.salesType()),
+            hasAnyMaterial(request.materials())
+        };
     }
 
     /** 신제품은 늘 나온다. 재고품·중고품은 보이는 수량(재고 - 잡아 둔 수량)이 남은 옵션이 있어야 한다 */

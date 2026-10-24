@@ -30,6 +30,14 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success(products));
     }
 
+    @GetMapping("/filter-count")
+    public ResponseEntity<ApiResponse<ProductDto.FilterCountResponse>> countFilters(
+            @Valid ProductDto.SearchRequest request) {
+        ProductDto.FilterCountResponse counts = productService.countFilters(request);
+
+        return ResponseEntity.ok(ApiResponse.success(counts));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductDto.DetailResponse>> get(@PathVariable Long id) {
         ProductDto.DetailResponse product = productService.get(id);

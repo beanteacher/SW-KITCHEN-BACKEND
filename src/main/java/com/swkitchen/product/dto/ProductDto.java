@@ -18,6 +18,7 @@ import jakarta.validation.constraints.Size;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 import org.hibernate.validator.constraints.Range;
 
 public class ProductDto {
@@ -142,6 +143,39 @@ public class ProductDto {
         public SearchRequest {
             keyword = keyword == null || keyword.isBlank() ? null : keyword.strip();
             orderBy = orderBy == null ? OrderBy.POPULAR : orderBy;
+        }
+
+        // 필터 줄 옆 개수는 그 줄의 조건만 빼고 센다
+        public SearchRequest withoutCategory() {
+            return new SearchRequest(salesType, null, materials, keyword, orderBy);
+        }
+
+        public SearchRequest withoutSalesType() {
+            return new SearchRequest(null, categoryId, materials, keyword, orderBy);
+        }
+
+        public SearchRequest withoutMaterials() {
+            return new SearchRequest(salesType, categoryId, null, keyword, orderBy);
+        }
+    }
+
+    // 목록 필터 줄 옆 숫자 (C5 3.2). 다른 조건은 그대로 두고 그 줄만 골랐을 때 몇 개인지. 없는 줄은 0 이다
+    // total 은 분류 [전체], categories 에는 대분류·중분류가 함께 들어 있다
+    public record FilterCountResponse(
+            long total,
+            List<CategoryProductCount> categories,
+            List<SalesTypeCount> salesTypes,
+            List<MaterialCount> materials) {
+
+        public static FilterCountResponse of(
+                List<CategoryProductCount> middles,
+                List<CategoryProductCount> tops,
+                List<SalesTypeCount> salesTypes,
+                List<MaterialCount> materials) {
+            long total = middles.stream().mapToLong(CategoryProductCount::productCount).sum();
+            List<CategoryProductCount> categories = Stream.concat(tops.stream(), middles.stream()).toList();
+
+            return new FilterCountResponse(total, categories, salesTypes, materials);
         }
     }
 
@@ -426,5 +460,11 @@ public class ProductDto {
     // ── 저장소 → 서비스 (조회 결과) ──
 
     public record CategoryProductCount(Long categoryId, long productCount) {
+    }
+
+    public record SalesTypeCount(SalesType salesType, long productCount) {
+    }
+
+    public record MaterialCount(Material material, long productCount) {
     }
 }

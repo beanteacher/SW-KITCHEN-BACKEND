@@ -77,6 +77,16 @@ public class ProductService {
         return PageResponse.from(products.map(product -> ProductDto.SummaryResponse.of(product, imageProperties::urlOf)));
     }
 
+    /** 고객 목록 필터 줄 옆 개수. 정렬·페이지와 관계없다 */
+    @Transactional(readOnly = true)
+    public ProductDto.FilterCountResponse countFilters(ProductDto.SearchRequest request) {
+        return ProductDto.FilterCountResponse.of(
+            productRepository.countOnSaleByCategory(request),
+            productRepository.countOnSaleByParentCategory(request),
+            productRepository.countOnSaleBySalesType(request),
+            productRepository.countOnSaleByMaterial(request));
+    }
+
     /** 고객 상세. 보이는 수량이 0 인 재고품·중고품도 목록에서만 빠지고 상세는 열린다 (DEC-076) */
     @Transactional(readOnly = true)
     public ProductDto.DetailResponse get(Long id) {

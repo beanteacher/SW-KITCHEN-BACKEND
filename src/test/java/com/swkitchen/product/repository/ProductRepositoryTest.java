@@ -211,6 +211,46 @@ class ProductRepositoryTest {
     }
 
     @Test
+    @DisplayName("필터 개수: 그 줄의 조건만 빼고 다른 조건은 그대로 둔 채 분류·판매 구분·재질별로 센다. 팔 수 없는 재고품은 세지 않는다")
+    void countOnSale() {
+        Category kitchen = categoryRepository.saveAndFlush(Category.create(null, "조리", "KT", 2));
+        Category range = categoryRepository.saveAndFlush(Category.create(kitchen, "가스레인지", "GR", 1));
+        Product a = saveWithOption(fridge, "RFUR-00001", "냉장고", SalesType.NEW, null);
+        a.changeMaterials(List.of(Material.STAINLESS, Material.PLASTIC));
+        Product b = saveWithOption(freezer, "RFUF-00002", "냉동고", SalesType.STOCK, null);
+        b.changeMaterials(List.of(Material.STAINLESS));
+        Product c = saveWithOption(range, "KTGR-00003", "레인지", SalesType.NEW, null);
+        c.changeMaterials(List.of(Material.STEEL));
+        Product soldOut = product(freezer, "RFUF-00004");
+        soldOut.change(freezer, "재고 0", SalesType.STOCK, "제조사", "한국", null);
+        soldOut.changeMaterials(List.of(Material.STAINLESS));
+        productRepository.save(soldOut);
+        addOption(soldOut, 900, 10_000, 0);
+        productRepository.flush();
+
+        // 재질 STAINLESS 를 고른 상태: 분류·판매 구분 개수는 재질 조건을 지키고, 재질 개수는 재질 조건 없이 센다
+        ProductDto.SearchRequest stainless = request(null, null, List.of(Material.STAINLESS), null, null);
+        Long top = fridge.getParent().getId();
+
+        assertThat(productRepository.countOnSaleByCategory(stainless)).containsExactlyInAnyOrder(
+            new ProductDto.CategoryProductCount(fridge.getId(), 1),
+            new ProductDto.CategoryProductCount(freezer.getId(), 1));
+        assertThat(productRepository.countOnSaleByParentCategory(stainless)).containsExactly(
+            new ProductDto.CategoryProductCount(top, 2));
+        assertThat(productRepository.countOnSaleBySalesType(stainless)).containsExactlyInAnyOrder(
+            new ProductDto.SalesTypeCount(SalesType.NEW, 1),
+            new ProductDto.SalesTypeCount(SalesType.STOCK, 1));
+        assertThat(productRepository.countOnSaleByMaterial(stainless)).containsExactlyInAnyOrder(
+            new ProductDto.MaterialCount(Material.STAINLESS, 2),
+            new ProductDto.MaterialCount(Material.PLASTIC, 1),
+            new ProductDto.MaterialCount(Material.STEEL, 1));
+
+        // 분류를 고른 상태: 재질 개수는 그 분류 안에서 센다
+        assertThat(productRepository.countOnSaleByMaterial(request(null, kitchen.getId(), null, null, null)))
+            .containsExactly(new ProductDto.MaterialCount(Material.STEEL, 1));
+    }
+
+    @Test
     @DisplayName("관리 목록: 제품명·상품 코드(소문자로 써도)·모델명으로 찾고 제조사로는 찾지 않는다. 검색어의 % 는 글자 그대로 찾는다")
     void searchAdminByKeyword() {
         Product discount = saveWithOption(fridge, "RFUR-00001", "50% 할인 냉장고", SalesType.NEW, "WSM-1243RF");

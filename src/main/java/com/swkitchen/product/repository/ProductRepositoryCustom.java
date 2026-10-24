@@ -12,5 +12,13 @@ public interface ProductRepositoryCustom {
 
     Page<Product> search(ProductDto.SearchRequest request, Pageable pageable);
 
+    List<ProductDto.CategoryProductCount> countOnSaleByCategory(ProductDto.SearchRequest request);
+
+    List<ProductDto.CategoryProductCount> countOnSaleByParentCategory(ProductDto.SearchRequest request);
+
+    List<ProductDto.SalesTypeCount> countOnSaleBySalesType(ProductDto.SearchRequest request);
+
+    List<ProductDto.MaterialCount> countOnSaleByMaterial(ProductDto.SearchRequest request);
+
     Page<Product> searchAdmin(ProductDto.AdminSearchRequest request, Pageable pageable);
 }

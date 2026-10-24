@@ -107,6 +107,31 @@ class ProductControllerTest {
     }
 
     @Test
+    @DisplayName("필터 개수: 로그인 없이 열리고, 전체·대분류·중분류·판매 구분·재질별 개수를 준다")
+    void filterCount() throws Exception {
+        create("""
+            { "categoryId": %d, "name": "업소용 냉장고", "salesType": "STOCK", "manufacturer": "우성", "origin": "국산",
+              "materials": ["STAINLESS", "PLASTIC"],
+              "options": [ { "widthMm": 1200, "depthMm": 600, "heightMm": 800, "listPrice": 20000,
+                             "discountType": "NONE", "stockQty": 1, "mainImageKey": "%s" } ] }
+            """.formatted(fridge.getId(), KEY1));
+
+        mvc.perform(get("/api/v1/product/filter-count").param("salesType", "STOCK", "USED").param("materials", "PLASTIC"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.categories.length()").value(2))
+            .andExpect(jsonPath("$.data.categories[0].categoryId").value(fridge.getParent().getId()))
+            .andExpect(jsonPath("$.data.categories[0].productCount").value(1))
+            .andExpect(jsonPath("$.data.categories[1].categoryId").value(fridge.getId()))
+            .andExpect(jsonPath("$.data.salesTypes[0].salesType").value("STOCK"))
+            .andExpect(jsonPath("$.data.salesTypes[0].productCount").value(1))
+            .andExpect(jsonPath("$.data.materials.length()").value(2));
+        mvc.perform(get("/api/v1/product/filter-count").param("salesType", "NEW"))
+            .andExpect(jsonPath("$.data.total").value(0))
+            .andExpect(jsonPath("$.data.categories").isEmpty());
+    }
+
+    @Test
     @DisplayName("상세: 로그인 없이 열리고, 모델명·재고·잡아 둔 수량 없이 보이는 수량과 이미지 주소를 준다. 없는 제품은 404")
     void detail() throws Exception {
         String created = create("""
