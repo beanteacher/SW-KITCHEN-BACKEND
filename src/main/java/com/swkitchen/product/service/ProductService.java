@@ -241,6 +241,47 @@ public class ProductService {
     }
 
     /**
+     * 고른 제품을 모두 지운다. 하나라도 없거나 지울 수 없으면 아무것도 지우지 않는다.
+     * FK 가 RESTRICT 라 옵션 이미지 → 옵션 → 사양·이미지 → 제품(재질은 제품과 함께) 순서로 지운다.
+     * 상품 코드 번호는 되돌리지 않아 지운 번호를 다시 쓰지 않는다. S3 의 이미지 파일은 남긴다
+     */
+    public void delete(List<Long> ids) {
+        List<Long> distinctIds = ids.stream().distinct().toList();
+        List<Product> products = productRepository.findAllById(distinctIds);
+        if (products.size() != distinctIds.size()) {
+            throw new AppException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
+        checkDeletable(ids, products);
+
+        // 일괄 삭제(deleteAllInBatch)를 쓰면 지운 옵션이 영속성 컨텍스트에 남아 지운 제품을 가리킨다. 엔티티로 하나씩 지운다
+        for (Product product : products) {
+            product.getOptions().forEach(option -> optionImageRepository.deleteAll(option.getImages()));
+            productOptionRepository.deleteAll(product.getOptions());
+            productSpecRepository.deleteAll(product.getSpecs());
+            productImageRepository.deleteAll(product.getImages());
+            productDetailImageRepository.deleteAll(product.getDetailImages());
+        }
+        productRepository.deleteAll(products);
+    }
+
+    /** 주문·견적 기능을 만들면 거기에 쓰인 제품도 막는다. 막힌 제품은 요청의 몇 번째 id 인지와 이름을 담는다 */
+    private static void checkDeletable(List<Long> ids, List<Product> products) {
+        Map<Long, Product> byId = products.stream().collect(Collectors.toMap(Product::getId, Function.identity()));
+        List<ErrorResponse.FieldError> blocked = new ArrayList<>();
+        Set<Long> seen = new HashSet<>();
+        for (int i = 0; i < ids.size(); i++) {
+            Product product = byId.get(ids.get(i));
+            boolean reserved = product.getOptions().stream().anyMatch(option -> option.getReservedQty() > 0);
+            if (reserved && seen.add(product.getId())) {
+                blocked.add(new ErrorResponse.FieldError("ids[" + i + "]", product.getName()));
+            }
+        }
+        if (!blocked.isEmpty()) {
+            throw new AppException(ErrorCode.PRODUCT_IN_USE, blocked);
+        }
+    }
+
+    /**
      * 옵션 이미지·사양·제품 이미지는 통째로 지우고 뒤에서 다시 넣는다. 빠진 옵션도 여기서 지운다.
      * 새로 넣는 행과 지울 행이 같은 치수·이름일 수 있어 지우기는 바로 실행한다
      */

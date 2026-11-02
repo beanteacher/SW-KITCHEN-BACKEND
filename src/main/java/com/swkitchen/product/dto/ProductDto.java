@@ -134,6 +134,13 @@ public class ProductDto {
         }
     }
 
+    // 관리 목록에서 고른 제품들. 쿼리 ids=1&ids=2 로 받는다
+    public record DeleteRequest(
+            @NotEmpty(message = "삭제할 제품을 골라 주세요.")
+            @Size(max = 20, message = "한 번에 20개까지 삭제할 수 있습니다.")
+            List<@NotNull(message = "삭제할 제품을 골라 주세요.") Long> ids) {
+    }
+
     // 고객 목록·검색 조건. 모두 비우면 전체 제품이다. 검색어는 앞뒤 공백을 지우고, 비면 조건에서 뺀다
     // scope 는 들어온 화면의 범위(신제품 / 재고·중고품), salesType 은 그 안에서 사용자가 고른 판매 구분이다
     public record SearchRequest(

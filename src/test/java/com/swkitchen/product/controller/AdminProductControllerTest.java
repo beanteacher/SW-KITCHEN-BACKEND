@@ -1,6 +1,7 @@
 package com.swkitchen.product.controller;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -13,6 +14,7 @@ import com.swkitchen.auth.domain.Role;
 import com.swkitchen.category.domain.Category;
 import com.swkitchen.category.repository.CategoryRepository;
 import com.swkitchen.common.security.JwtProvider;
+import jakarta.persistence.EntityManager;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,6 +24,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +46,12 @@ class AdminProductControllerTest {
 
     @Autowired
     JwtProvider jwtProvider;
+
+    @Autowired
+    JdbcTemplate jdbc;
+
+    @Autowired
+    EntityManager em;
 
     Category top;
     Category fridge;
@@ -254,6 +263,89 @@ class AdminProductControllerTest {
         mvc.perform(post("/api/v1/admin/product").cookie(accessToken(Role.ADMIN))
                 .contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("삭제: 고른 제품을 옵션·사양·재질·이미지와 함께 지운다. 그 제품만 있던 분류는 지울 수 있게 된다")
+    void deleteProducts() throws Exception {
+        int first = createSimple("냉장고 A", 1200);
+        int second = createSimple("냉장고 B", 1500);
+
+        mvc.perform(delete("/api/v1/admin/product").param("ids", "" + first, "" + second, "" + first)
+                .cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isOk());
+        // 요청마다 트랜잭션이 끝나는 실제 서버처럼 지운 결과를 DB 에 반영하고 다시 읽는다
+        em.flush();
+        em.clear();
+
+        mvc.perform(get("/api/v1/admin/product/" + first).cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/product/" + second))
+            .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/v1/admin/category/" + fridge.getId()).cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("삭제: 잡아 둔 수량이 있는 제품이 섞이면 409 와 막힌 제품을 주고 아무것도 지우지 않는다. 없는 제품은 404")
+    void deleteBlocked() throws Exception {
+        int free = createSimple("냉장고 A", 1200);
+        int held = createSimple("냉장고 B", 1500);
+        // 잡아 둔 수량은 주방 설계 기능이 바꾼다. 아직 없어 DB 에 직접 넣는다
+        jdbc.update("UPDATE product_option SET reserved_qty = 1 WHERE product_id = ?", held);
+        // 테스트 트랜잭션 하나에서 요청이 이어지므로, 앞서 읽어 둔 옵션을 버리고 DB 값을 다시 읽게 한다
+        em.flush();
+        em.clear();
+
+        mvc.perform(delete("/api/v1/admin/product").param("ids", "" + free, "" + held).cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("PRODUCT_IN_USE"))
+            .andExpect(jsonPath("$.errors[0].field").value("ids[1]"))
+            .andExpect(jsonPath("$.errors[0].message").value("냉장고 B"));
+        mvc.perform(get("/api/v1/admin/product/" + free).cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isOk());
+
+        mvc.perform(delete("/api/v1/admin/product").param("ids", "" + free, "999999").cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("PRODUCT_NOT_FOUND"));
+        mvc.perform(get("/api/v1/admin/product/" + free).cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("삭제: 고르지 않았거나 20개를 넘으면 400, 로그인 안 하면 401, 고객은 403 이다")
+    void deleteErrors() throws Exception {
+        int id = createSimple("냉장고 A", 1200);
+        String[] tooMany = new String[21];
+        for (int i = 0; i < tooMany.length; i++) {
+            tooMany[i] = String.valueOf(i + 1);
+        }
+
+        mvc.perform(delete("/api/v1/admin/product").cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].field").value("ids"));
+        mvc.perform(delete("/api/v1/admin/product").param("ids", tooMany).cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isBadRequest());
+        mvc.perform(delete("/api/v1/admin/product").param("ids", "" + id))
+            .andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/v1/admin/product").param("ids", "" + id).cookie(accessToken(Role.CUSTOMER)))
+            .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/product/" + id).cookie(accessToken(Role.STAFF)))
+            .andExpect(status().isOk());
+    }
+
+    // 재고품 옵션 하나에 재질·사양·이미지·상세 이미지·옵션 이미지를 모두 단 제품
+    private int createSimple(String name, int widthMm) throws Exception {
+        String response = create("""
+            { "categoryId": %d, "name": "%s", "salesType": "STOCK", "manufacturer": "우성", "origin": "국산",
+              "materials": ["STAINLESS"], "specs": [ { "name": "소비전력", "value": "1300W" } ],
+              "imageKeys": ["%s"], "detailImageKeys": ["%s"],
+              "options": [ { "widthMm": %d, "depthMm": 600, "heightMm": 800, "listPrice": 10000,
+                             "discountType": "NONE", "stockQty": 2, "mainImageKey": "%s", "imageKeys": ["%s"] } ] }
+            """.formatted(fridge.getId(), name, KEY1, KEY2, widthMm, KEY1, KEY2))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(response, "$.data.id");
     }
 
     private ResultActions create(String body) throws Exception {
