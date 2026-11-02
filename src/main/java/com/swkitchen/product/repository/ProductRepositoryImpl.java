@@ -65,14 +65,14 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
         return new PageImpl<>(products, pageable, total);
     }
 
-    /** 중분류별 개수. 분류 조건만 빼고 센다 (필터의 분류 줄). 대분류는 서비스가 아래 중분류를 더한다 */
+    /** 중분류별 개수. 화면 범위·검색어로만 센다 (필터의 분류 줄). 대분류는 서비스가 아래 중분류를 더한다 */
     @Override
     public List<ProductDto.CategoryProductCount> countOnSaleByCategory(ProductDto.SearchRequest request) {
         return queryFactory
             .select(Projections.constructor(ProductDto.CategoryProductCount.class, category.id, product.count()))
             .from(product)
             .join(product.category, category)
-            .where(onSaleConditions(request.withoutCategory()))
+            .where(onSaleConditions(request.scopeOnly()))
             .groupBy(category.id)
             .fetch();
     }
@@ -137,6 +137,7 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
             onSale(),
             keywordMatches(request.keyword()),
             inCategory(request.categoryId()),
+            inScope(request.scope()),
             salesTypeIn(request.salesType()),
             hasAnyMaterial(request.materials())
         };
@@ -223,6 +224,13 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
             return null;
         }
         return category.id.eq(categoryId).or(category.parent.id.eq(categoryId));
+    }
+
+    private static BooleanExpression inScope(ProductDto.Scope scope) {
+        if (scope == null) {
+            return null;
+        }
+        return salesTypeIn(scope.getSalesTypes());
     }
 
     private static BooleanExpression salesTypeIn(List<SalesType> salesTypes) {

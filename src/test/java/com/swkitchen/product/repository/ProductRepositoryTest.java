@@ -143,7 +143,7 @@ class ProductRepositoryTest {
     }
 
     @Test
-    @DisplayName("고객 목록: 신제품은 늘 나오고, 재고품·중고품은 보이는 수량(재고 - 잡아 둔 수량)이 남은 옵션이 있어야 나온다")
+    @DisplayName("고객 목록: 신제품은 늘 나오고, 재고품·중고품은 보이는 수량(재고 - 잡아 둔 수량)이 남은 옵션이 있어야 나온다. 잡아 둔 수량이 풀리면 다시 나온다")
     void searchOnlyOnSale() {
         Product newOne = saveWithOption(fridge, "RFUR-00001", "신제품", SalesType.NEW, null);
         Product left = saveWithOption(fridge, "RFUR-00002", "남은 중고", SalesType.USED, null);
@@ -156,6 +156,11 @@ class ProductRepositoryTest {
         jdbc.update("UPDATE product_option SET reserved_qty = 1 WHERE product_id = ?", reserved.getId());
 
         assertThat(search(request(null, null, null, null, null))).containsExactly(left.getId(), newOne.getId());
+
+        // 잡아 둔 수량이 0 으로 돌아오면 다시 나온다
+        jdbc.update("UPDATE product_option SET reserved_qty = 0 WHERE product_id = ?", reserved.getId());
+        assertThat(search(request(null, null, null, null, null)))
+            .containsExactly(reserved.getId(), left.getId(), newOne.getId());
     }
 
     @Test
@@ -173,7 +178,7 @@ class ProductRepositoryTest {
     }
 
     @Test
-    @DisplayName("고객 목록: 판매 구분·분류로 거르고, 재질은 고른 것 중 하나라도 가진 제품이다")
+    @DisplayName("고객 목록: 화면 범위·판매 구분·분류로 거르고, 재질은 고른 것 중 하나라도 가진 제품이다")
     void searchByFilters() {
         Product stainless = saveWithOption(fridge, "RFUR-00001", "냉장고", SalesType.NEW, null);
         stainless.changeMaterials(List.of(Material.STAINLESS, Material.PLASTIC));
@@ -182,8 +187,11 @@ class ProductRepositoryTest {
         Product none = saveWithOption(freezer, "RFUF-00003", "냉동고", SalesType.USED, null);
         productRepository.flush();
 
-        assertThat(search(request(List.of(SalesType.STOCK, SalesType.USED), null, null, null, null)))
+        assertThat(search(request(ProductDto.Scope.STOCK, null, null, null)))
             .containsExactly(none.getId(), steel.getId());
+        assertThat(search(request(ProductDto.Scope.NEW, null, null, null))).containsExactly(stainless.getId());
+        assertThat(search(scopedRequest(ProductDto.Scope.STOCK, List.of(SalesType.USED), null, null)))
+            .containsExactly(none.getId());
         assertThat(search(request(null, fridge.getParent().getId(), null, null, null)))
             .containsExactly(none.getId(), steel.getId(), stainless.getId());
         assertThat(search(request(null, freezer.getId(), null, null, null))).containsExactly(none.getId(), steel.getId());
@@ -211,7 +219,7 @@ class ProductRepositoryTest {
     }
 
     @Test
-    @DisplayName("필터 개수: 그 줄의 조건만 빼고 다른 조건은 그대로 둔 채 분류·판매 구분·재질별로 센다. 팔 수 없는 재고품은 세지 않는다")
+    @DisplayName("필터 개수: 분류는 화면 범위로만 세고, 판매 구분·재질은 그 줄의 조건만 빼고 센다. 팔 수 없는 재고품은 세지 않는다")
     void countOnSale() {
         Category kitchen = categoryRepository.saveAndFlush(Category.create(null, "조리", "KT", 2));
         Category range = categoryRepository.saveAndFlush(Category.create(kitchen, "가스레인지", "GR", 1));
@@ -228,12 +236,22 @@ class ProductRepositoryTest {
         addOption(soldOut, 900, 10_000, 0);
         productRepository.flush();
 
-        // 재질 STAINLESS 를 고른 상태: 분류·판매 구분 개수는 재질 조건을 지키고, 재질 개수는 재질 조건 없이 센다
-        ProductDto.SearchRequest stainless = request(null, null, List.of(Material.STAINLESS), null, null);
+        // 재질 STAINLESS 를 고른 상태: 판매 구분 개수는 재질 조건을 지키고, 재질 개수는 재질 조건 없이 센다
+        ProductDto.SearchRequest stainless = request(null, null, List.of(Material.STAINLESS), null);
 
+        // 분류 개수는 재질과 상관없다 (STEEL 인 레인지도 센다)
         assertThat(productRepository.countOnSaleByCategory(stainless)).containsExactlyInAnyOrder(
             new ProductDto.CategoryProductCount(fridge.getId(), 1),
-            new ProductDto.CategoryProductCount(freezer.getId(), 1));
+            new ProductDto.CategoryProductCount(freezer.getId(), 1),
+            new ProductDto.CategoryProductCount(range.getId(), 1));
+        // 재고·중고품 화면에서 재고품을 고른 상태: 분류 개수는 화면 범위(재고품·중고품)로만 센다
+        ProductDto.SearchRequest stockPicked = scopedRequest(
+            ProductDto.Scope.STOCK,
+            List.of(SalesType.STOCK),
+            kitchen.getId(),
+            List.of(Material.STEEL));
+        assertThat(productRepository.countOnSaleByCategory(stockPicked))
+            .containsExactly(new ProductDto.CategoryProductCount(freezer.getId(), 1));
         assertThat(productRepository.countOnSaleBySalesType(stainless)).containsExactlyInAnyOrder(
             new ProductDto.SalesTypeCount(SalesType.NEW, 1),
             new ProductDto.SalesTypeCount(SalesType.STOCK, 1));
@@ -243,7 +261,7 @@ class ProductRepositoryTest {
             new ProductDto.MaterialCount(Material.STEEL, 1));
 
         // 분류를 고른 상태: 재질 개수는 그 분류 안에서 센다
-        assertThat(productRepository.countOnSaleByMaterial(request(null, kitchen.getId(), null, null, null)))
+        assertThat(productRepository.countOnSaleByMaterial(request(null, kitchen.getId(), null, null)))
             .containsExactly(new ProductDto.MaterialCount(Material.STEEL, 1));
     }
 
@@ -295,13 +313,30 @@ class ProductRepositoryTest {
             .getContent();
     }
 
+    // 사용자가 판매 구분을 고르지 않은 조건
     private static ProductDto.SearchRequest request(
-            List<SalesType> salesTypes,
+            ProductDto.Scope scope,
             Long categoryId,
             List<Material> materials,
             String keyword,
             ProductDto.OrderBy orderBy) {
-        return new ProductDto.SearchRequest(salesTypes, categoryId, materials, keyword, orderBy);
+        return new ProductDto.SearchRequest(scope, null, categoryId, materials, keyword, orderBy);
+    }
+
+    private static ProductDto.SearchRequest request(
+            ProductDto.Scope scope,
+            Long categoryId,
+            List<Material> materials,
+            String keyword) {
+        return request(scope, categoryId, materials, keyword, null);
+    }
+
+    private static ProductDto.SearchRequest scopedRequest(
+            ProductDto.Scope scope,
+            List<SalesType> salesTypes,
+            Long categoryId,
+            List<Material> materials) {
+        return new ProductDto.SearchRequest(scope, salesTypes, categoryId, materials, null, null);
     }
 
     private void addOption(Product product, int widthMm, int listPrice, Integer stockQty) {

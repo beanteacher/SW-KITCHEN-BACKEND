@@ -68,7 +68,7 @@ class ProductControllerTest {
                              "discountType": "NONE", "mainImageKey": "%s" } ] }
             """.formatted(fridge.getId(), KEY2));
 
-        mvc.perform(get("/api/v1/product").param("salesType", "STOCK", "USED"))
+        mvc.perform(get("/api/v1/product").param("scope", "STOCK"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.totalElements").value(1))
             .andExpect(jsonPath("$.data.page").value(1))
@@ -82,7 +82,7 @@ class ProductControllerTest {
             .andExpect(jsonPath("$.data.content[0].price.discountValue").value(50))
             .andExpect(jsonPath("$.data.content[0].price.varies").value(true))
             .andExpect(jsonPath("$.data.content[0].visibleQty").value(3));
-        mvc.perform(get("/api/v1/product").param("salesType", "NEW"))
+        mvc.perform(get("/api/v1/product").param("scope", "NEW"))
             .andExpect(jsonPath("$.data.content[0].name").value("업소용 냉장고"))
             .andExpect(jsonPath("$.data.content[0].price.varies").value(false))
             .andExpect(jsonPath("$.data.content[0].visibleQty").doesNotExist());
@@ -91,7 +91,7 @@ class ProductControllerTest {
     }
 
     @Test
-    @DisplayName("목록: 없는 정렬·재질·판매 구분, 50자 넘는 검색어는 400 이다")
+    @DisplayName("목록: 없는 정렬·재질·판매 구분·화면 범위, 화면 범위 밖 판매 구분, 50자 넘는 검색어는 400 이다")
     void searchErrors() throws Exception {
         mvc.perform(get("/api/v1/product").param("orderBy", "CHEAPEST"))
             .andExpect(status().isBadRequest())
@@ -102,6 +102,11 @@ class ProductControllerTest {
             .andExpect(jsonPath("$.errors[0].field").value("materials"));
         mvc.perform(get("/api/v1/product").param("salesType", "RENTAL"))
             .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/product").param("scope", "USED"))
+            .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/product").param("scope", "STOCK").param("salesType", "NEW"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors[0].message").value("이 화면에서 고를 수 없는 판매 구분입니다."));
         mvc.perform(get("/api/v1/product").param("keyword", "가".repeat(51)))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.errors[0].field").value("keyword"));
@@ -118,8 +123,9 @@ class ProductControllerTest {
                              "discountType": "NONE", "stockQty": 1, "mainImageKey": "%s" } ] }
             """.formatted(fridge.getId(), KEY1));
 
-        // 재질 PLASTIC 을 고른 재고·중고품 화면. 재질 줄은 재질 조건 없이, 나머지 줄은 PLASTIC 조건을 지켜 센다
-        mvc.perform(get("/api/v1/product/filter").param("salesType", "STOCK", "USED").param("materials", "PLASTIC"))
+        // 재고·중고품 화면에서 재질 PLASTIC 을 고른 상태. 분류 줄은 화면 범위로만,
+        // 판매 구분 줄은 PLASTIC 조건을 지켜, 재질 줄은 재질 조건 없이 센다
+        mvc.perform(get("/api/v1/product/filter").param("scope", "STOCK").param("materials", "PLASTIC"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.categories[0].id").value(fridge.getParent().getId()))
@@ -135,8 +141,13 @@ class ProductControllerTest {
             .andExpect(jsonPath("$.data.materials[*].code", contains("STAINLESS", "ALUMINUM", "STEEL", "PLASTIC")))
             .andExpect(jsonPath("$.data.materials[0].productCount").value(1))
             .andExpect(jsonPath("$.data.materials[1].productCount").value(0));
+        // 고르지 않은 재질(STEEL)이어도 분류 줄은 그대로 센다
+        mvc.perform(get("/api/v1/product/filter").param("scope", "STOCK").param("materials", "STEEL"))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.categories[0].children[0].productCount").value(1))
+            .andExpect(jsonPath("$.data.salesTypes[1].productCount").value(0));
         // 신제품 화면에는 맞는 제품이 없다
-        mvc.perform(get("/api/v1/product/filter").param("salesType", "NEW"))
+        mvc.perform(get("/api/v1/product/filter").param("scope", "NEW"))
             .andExpect(jsonPath("$.data.total").value(0))
             .andExpect(jsonPath("$.data.categories[0].productCount").value(0));
     }
