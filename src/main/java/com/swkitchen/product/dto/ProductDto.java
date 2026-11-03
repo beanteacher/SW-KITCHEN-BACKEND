@@ -10,6 +10,7 @@ import com.swkitchen.product.domain.ProductOption;
 import com.swkitchen.product.domain.ProductSpec;
 import com.swkitchen.product.domain.SalesType;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -18,6 +19,8 @@ import jakarta.validation.constraints.Size;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.UnaryOperator;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.hibernate.validator.constraints.Range;
 
 public class ProductDto {
@@ -131,8 +134,17 @@ public class ProductDto {
         }
     }
 
+    // 관리 목록에서 고른 제품들. 쿼리 ids=1&ids=2 로 받는다
+    public record DeleteRequest(
+            @NotEmpty(message = "삭제할 제품을 골라 주세요.")
+            @Size(max = 20, message = "한 번에 20개까지 삭제할 수 있습니다.")
+            List<@NotNull(message = "삭제할 제품을 골라 주세요.") Long> ids) {
+    }
+
     // 고객 목록·검색 조건. 모두 비우면 전체 제품이다. 검색어는 앞뒤 공백을 지우고, 비면 조건에서 뺀다
+    // scope 는 들어온 화면의 범위(신제품 / 재고·중고품), salesType 은 그 안에서 사용자가 고른 판매 구분이다
     public record SearchRequest(
+            Scope scope,
             List<SalesType> salesType,
             Long categoryId,
             List<Material> materials,
@@ -144,17 +156,23 @@ public class ProductDto {
             orderBy = orderBy == null ? OrderBy.POPULAR : orderBy;
         }
 
-        // 필터 줄 옆 개수는 그 줄의 조건만 빼고 센다
-        public SearchRequest withoutCategory() {
-            return new SearchRequest(salesType, null, materials, keyword, orderBy);
+        @AssertTrue(message = "이 화면에서 고를 수 없는 판매 구분입니다.")
+        public boolean isSalesTypeInScope() {
+            return scope == null || salesType == null || scope.getSalesTypes().containsAll(salesType);
         }
 
+        // 분류 줄 개수. 분류를 바꾸면 화면이 판매 구분·재질을 해제하므로 화면 범위·검색어로만 센다
+        public SearchRequest scopeOnly() {
+            return new SearchRequest(scope, null, null, null, keyword, orderBy);
+        }
+
+        // 판매 구분·재질 줄 개수는 그 줄의 조건만 빼고 센다
         public SearchRequest withoutSalesType() {
-            return new SearchRequest(null, categoryId, materials, keyword, orderBy);
+            return new SearchRequest(scope, null, categoryId, materials, keyword, orderBy);
         }
 
         public SearchRequest withoutMaterials() {
-            return new SearchRequest(salesType, categoryId, null, keyword, orderBy);
+            return new SearchRequest(scope, salesType, categoryId, null, keyword, orderBy);
         }
     }
 
@@ -185,6 +203,16 @@ public class ProductDto {
 
     // 재질의 한글 이름은 프론트가 선언해 쓴다
     public record MaterialFilterResponse(Material code, long productCount) {
+    }
+
+    // 고객 목록 화면의 범위. 검색 결과는 범위 없이 모든 판매 구분이다
+    @Getter
+    @RequiredArgsConstructor
+    public enum Scope {
+        NEW(List.of(SalesType.NEW)),
+        STOCK(List.of(SalesType.STOCK, SalesType.USED));
+
+        private final List<SalesType> salesTypes;
     }
 
     // 같은 값이면 신규 등록순. 인기순은 주문 기능 전까지 신규 등록순과 같다

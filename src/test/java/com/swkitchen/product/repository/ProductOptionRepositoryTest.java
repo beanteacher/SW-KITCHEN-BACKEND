@@ -89,6 +89,19 @@ class ProductOptionRepositoryTest {
     }
 
     @Test
+    @DisplayName("상품 코드는 모든 옵션에서 하나뿐이다. 같은 코드는 DB 가 막는다")
+    void duplicateProductCode() {
+        optionRepository.saveAndFlush(option(900, 15_000, DiscountType.NONE, null));
+        ProductOption second = optionRepository.saveAndFlush(option(1200, 15_000, DiscountType.NONE, null));
+
+        // 발급 순서가 꼬여 같은 코드가 나와도 DB 가 막는지 본다. 엔티티로는 코드를 바꿀 수 없어 직접 넣는다
+        assertThatThrownBy(() -> jdbc.update(
+            "UPDATE product_option SET product_code = 'WSWT-00015-01' WHERE id = ?",
+            second.getId()))
+            .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     @DisplayName("정률 100% 는 DB 가 막는다")
     void rateCheck() {
         assertThatThrownBy(() -> optionRepository.saveAndFlush(option(900, 10_000, DiscountType.RATE, 100)))

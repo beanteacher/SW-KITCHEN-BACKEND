@@ -26,6 +26,7 @@ public enum ErrorCode {
     CATEGORY_IN_USE(HttpStatus.CONFLICT, "하위 분류나 제품이 연결된 분류는 삭제할 수 없습니다."),
     CATEGORY_ABBR_LOCKED(HttpStatus.CONFLICT, "제품이 연결된 분류는 약어를 바꿀 수 없습니다."),
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "제품을 찾을 수 없습니다."),
+    PRODUCT_IN_USE(HttpStatus.CONFLICT, "잡아 둔 수량이 있는 제품은 삭제할 수 없습니다."),
     OPTION_NOT_IN_PRODUCT(HttpStatus.BAD_REQUEST, "이 제품의 옵션이 아닙니다."),
     OPTION_SIZE_DUPLICATE(HttpStatus.BAD_REQUEST, "같은 치수의 옵션이 있습니다."),
     SPEC_NAME_DUPLICATE(HttpStatus.BAD_REQUEST, "같은 이름의 사양이 있습니다."),
