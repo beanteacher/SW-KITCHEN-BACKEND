@@ -15,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,6 +34,25 @@ public class MemberController {
         SignupDto.UserIdCheckResponse result = signupService.checkUserId(request);
 
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @GetMapping("/find-id")
+    public ResponseEntity<ApiResponse<SignupDto.FindIdResponse>> findId(
+            @CookieValue(name = VERIFIED_IDENTITY, required = false) String verifiedIdentity) {
+        SignupDto.FindIdResponse result = signupService.findId(verifiedIdentity);
+
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @PatchMapping(value = "/password-reset", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @CookieValue(name = VERIFIED_IDENTITY, required = false) String verifiedIdentity,
+            @Valid @RequestBody SignupDto.PasswordResetRequest request) {
+        signupService.resetPassword(verifiedIdentity, request);
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, authCookies.clearVerifiedIdentity().toString())
+            .body(ApiResponse.success(null));
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)

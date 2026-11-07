@@ -51,7 +51,32 @@ public class SignupService {
         return authService.issueLogin(account);
     }
 
-    /** 아이디·비밀번호 없는 고객 계정을 만든다. 소셜 가입이 쓴다 */
+    @Transactional(readOnly = true)
+    public SignupDto.FindIdResponse findId(String verifiedIdentityCookie) {
+        return SignupDto.FindIdResponse.from(findVerifiedCustomer(verifiedIdentityCookie));
+    }
+
+    /** 바꾸면 그 계정의 모든 기기가 로그아웃된다. 로그인은 시키지 않는다 */
+    public void resetPassword(String verifiedIdentityCookie, SignupDto.PasswordResetRequest request) {
+        Account account = accountIdentityRepository.findByCiHash(
+                identityVerificationService.require(verifiedIdentityCookie, VerificationPurpose.FIND).ciHash())
+            .map(AccountIdentity::getAccount)
+            .filter(found -> request.userId().equals(found.getUserId()))
+            .orElseThrow(() -> new AppException(ErrorCode.IDENTITY_MISMATCH));
+
+        account.changePassword(passwordEncoder.encode(request.newPassword()));
+        account.resetLoginFailCount();
+        authService.logoutAll(account.getId());
+    }
+
+    private Account findVerifiedCustomer(String verifiedIdentityCookie) {
+        String ciHash = identityVerificationService.require(verifiedIdentityCookie, VerificationPurpose.FIND).ciHash();
+        return accountIdentityRepository.findByCiHash(ciHash)
+            .map(AccountIdentity::getAccount)
+            .orElseThrow(() -> new AppException(ErrorCode.ACCOUNT_NOT_FOUND));
+    }
+
+    /** 고객 계정과 본인확인 정보를 만든다. 소셜로 가입하면 아이디·비밀번호가 null 이다 */
     public Account createCustomer(
             IdentityVerificationDto.VerifiedIdentity verified,
             String userId,
