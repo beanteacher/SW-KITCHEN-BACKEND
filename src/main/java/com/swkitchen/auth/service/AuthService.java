@@ -10,7 +10,9 @@ import com.swkitchen.common.security.CryptoUtil;
 import com.swkitchen.common.security.JwtProvider;
 import com.swkitchen.common.security.SecurityProperties;
 import com.swkitchen.common.security.TurnstileClient;
+import com.swkitchen.common.validation.CustomerPassword;
 import com.swkitchen.member.domain.Account;
+import com.swkitchen.member.domain.Role;
 import com.swkitchen.member.repository.AccountRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -117,9 +119,17 @@ public class AuthService {
     public void changePassword(Long accountId, String refreshToken, AuthDto.ChangePasswordRequest request) {
         Account account = accountRepository.findById(accountId)
             .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
+        if (account.getPasswordHash() == null) {
+            throw new AppException(ErrorCode.NO_PASSWORD_ACCOUNT);
+        }
         if (isWrongPassword(request.currentPassword(), account.getPasswordHash())) {
             throw new AppException(ErrorCode.PASSWORD_MISMATCH,
                 List.of(new ErrorResponse.FieldError("currentPassword", ErrorCode.PASSWORD_MISMATCH.getMessage())));
+        }
+        // 직원은 짧아도 받고 고객만 규칙을 본다. 역할을 DB 에서 알아야 해서 @Valid 로 못 한다
+        if (account.getRole() == Role.CUSTOMER && !CustomerPassword.Validator.isValid(request.newPassword())) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
+                List.of(new ErrorResponse.FieldError("newPassword", CustomerPassword.MESSAGE)));
         }
 
         account.changePassword(passwordEncoder.encode(request.newPassword()));
@@ -152,6 +162,11 @@ public class AuthService {
         refreshTokenRepository.save(refreshToken);
 
         return token;
+    }
+
+    /** 탈퇴처럼 비밀번호를 다시 확인하는 곳이 쓴다 */
+    public boolean matchesPassword(Account account, String password) {
+        return account.getPasswordHash() != null && !isWrongPassword(password, account.getPasswordHash());
     }
 
     private boolean isWrongPassword(String password, String passwordHash) {

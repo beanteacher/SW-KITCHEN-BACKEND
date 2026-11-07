@@ -47,6 +47,7 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health", "/error").permitAll()
                 // API 문서. 운영은 application-prod.yml 에서 꺼서 이 주소가 없다
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/api/v1/member/me/**").hasAuthority("MEMBER_SELF")
                 .requestMatchers("/api/v1/admin/product/**", "/api/v1/admin/category/**", "/api/v1/admin/image/**")
                     .hasAuthority("PRODUCT_MANAGE")
                 .requestMatchers("/api/v1/admin/member/**").hasAuthority("MEMBER_READ")

@@ -29,6 +29,8 @@ public enum ErrorCode {
     // 비밀번호 재설정에서 입력한 아이디가 본인확인한 사람의 계정이 아님, 휴대폰 번호 변경의 본인확인이 다른 사람
     IDENTITY_MISMATCH(HttpStatus.CONFLICT, "본인확인한 분의 계정이 아닙니다."),
     NO_PASSWORD_ACCOUNT(HttpStatus.CONFLICT, "카카오·네이버로 가입한 계정은 비밀번호가 없습니다."),
+    // 소셜로만 가입한 계정이 소셜 로그인을 다시 하지 않고 탈퇴
+    REAUTH_REQUIRED(HttpStatus.BAD_REQUEST, "탈퇴하려면 가입한 소셜 계정으로 다시 로그인해 주세요."),
     USER_ID_DUPLICATE(HttpStatus.CONFLICT, "이미 쓰고 있는 아이디입니다."),
     STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "직원 계정을 찾을 수 없습니다."),
     SELF_CHANGE_NOT_ALLOWED(HttpStatus.CONFLICT, "자기 계정은 정지하거나 역할을 바꿀 수 없습니다."),
