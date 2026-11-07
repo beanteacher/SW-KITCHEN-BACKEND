@@ -11,12 +11,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import com.swkitchen.auth.domain.Account;
-import com.swkitchen.auth.domain.AccountStatus;
 import com.swkitchen.auth.domain.RefreshToken;
-import com.swkitchen.auth.domain.Role;
 import com.swkitchen.auth.dto.AuthDto;
-import com.swkitchen.auth.repository.AccountRepository;
 import com.swkitchen.auth.repository.RefreshTokenRepository;
 import com.swkitchen.common.exception.AppException;
 import com.swkitchen.common.exception.ErrorCode;
@@ -24,6 +20,10 @@ import com.swkitchen.common.security.CryptoUtil;
 import com.swkitchen.common.security.JwtProvider;
 import com.swkitchen.common.security.SecurityProperties;
 import com.swkitchen.common.security.TurnstileClient;
+import com.swkitchen.member.domain.Account;
+import com.swkitchen.member.domain.AccountStatus;
+import com.swkitchen.member.domain.Role;
+import com.swkitchen.member.repository.AccountRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -244,6 +244,14 @@ class AuthServiceTest {
         authService.logout(1L, "");
 
         verifyNoInteractions(refreshTokenRepository);
+    }
+
+    @Test
+    @DisplayName("모든 기기 로그아웃: 그 계정의 리프레시 토큰을 모두 지운다")
+    void logoutAll() {
+        authService.logoutAll(1L);
+
+        verify(refreshTokenRepository).deleteByAccountId(1L);
     }
 
     // ── 내 정보 ──

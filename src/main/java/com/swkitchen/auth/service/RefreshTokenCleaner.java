@@ -19,7 +19,7 @@ public class RefreshTokenCleaner {
     @Transactional
     public void deleteUnusable() {
         LocalDateTime now = LocalDateTime.now();
-        int deleted = refreshTokenRepository.deleteUnusable(now, now.minus(AuthService.ROTATED_TOKEN_GRACE_TIME));
+        long deleted = refreshTokenRepository.deleteUnusable(now, now.minus(AuthService.ROTATED_TOKEN_GRACE_TIME));
         log.info("쓸 수 없는 리프레시 토큰 {}개를 지웠습니다", deleted);
     }
 }

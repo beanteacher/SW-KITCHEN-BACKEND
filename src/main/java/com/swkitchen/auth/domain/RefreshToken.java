@@ -1,5 +1,6 @@
 package com.swkitchen.auth.domain;
 
+import com.swkitchen.member.domain.Account;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

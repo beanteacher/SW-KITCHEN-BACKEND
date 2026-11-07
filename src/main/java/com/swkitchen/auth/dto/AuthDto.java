@@ -1,8 +1,8 @@
 package com.swkitchen.auth.dto;
 
-import com.swkitchen.auth.domain.Account;
-import com.swkitchen.auth.domain.Role;
 import com.swkitchen.common.validation.MaxBytes;
+import com.swkitchen.member.domain.Account;
+import com.swkitchen.member.domain.Role;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;

@@ -1,9 +1,9 @@
-package com.swkitchen.auth.service;
+package com.swkitchen.member.service;
 
-import com.swkitchen.auth.domain.Account;
-import com.swkitchen.auth.domain.Role;
-import com.swkitchen.auth.repository.AccountRepository;
 import com.swkitchen.common.security.SecurityProperties;
+import com.swkitchen.member.domain.Account;
+import com.swkitchen.member.domain.Role;
+import com.swkitchen.member.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;

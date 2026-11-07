@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import com.swkitchen.TestcontainersConfig;
-import com.swkitchen.auth.domain.Role;
+import com.swkitchen.member.domain.Role;
 import com.swkitchen.common.security.JwtProvider;
 import jakarta.servlet.http.Cookie;
 import java.net.URI;

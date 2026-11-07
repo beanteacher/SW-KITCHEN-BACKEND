@@ -1,9 +1,7 @@
 package com.swkitchen.auth.service;
 
-import com.swkitchen.auth.domain.Account;
 import com.swkitchen.auth.domain.RefreshToken;
 import com.swkitchen.auth.dto.AuthDto;
-import com.swkitchen.auth.repository.AccountRepository;
 import com.swkitchen.auth.repository.RefreshTokenRepository;
 import com.swkitchen.common.dto.ErrorResponse;
 import com.swkitchen.common.exception.AppException;
@@ -12,6 +10,8 @@ import com.swkitchen.common.security.CryptoUtil;
 import com.swkitchen.common.security.JwtProvider;
 import com.swkitchen.common.security.SecurityProperties;
 import com.swkitchen.common.security.TurnstileClient;
+import com.swkitchen.member.domain.Account;
+import com.swkitchen.member.repository.AccountRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -106,6 +106,11 @@ public class AuthService {
         if (StringUtils.hasText(refreshToken)) {
             refreshTokenRepository.deleteByTokenHashAndAccountId(CryptoUtil.sha256(refreshToken), accountId);
         }
+    }
+
+    /** 그 계정의 모든 기기를 로그아웃시킨다. 이미 받은 액세스 토큰은 만료까지 쓰이고 다음 재발급에서 막힌다 */
+    public void logoutAll(Long accountId) {
+        refreshTokenRepository.deleteByAccountId(accountId);
     }
 
     /** 바꾸면 이 기기만 남기고 다른 기기는 로그아웃된다 */

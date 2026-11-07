@@ -1,4 +1,4 @@
-package com.swkitchen.auth.domain;
+package com.swkitchen.member.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -7,7 +7,12 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -54,6 +59,10 @@ public class Account {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @OneToMany(mappedBy = "account")
+    @OrderBy("id")
+    private List<SocialAccount> socialAccounts = new ArrayList<>();
+
     public static Account create(String userId, String passwordHash, String name, Role role) {
         Account account = new Account();
         account.userId = userId;
@@ -78,5 +87,21 @@ public class Account {
 
     public void changePassword(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public void changeRole(Role role) {
+        this.role = role;
+    }
+
+    public void changeStatus(AccountStatus status) {
+        this.status = status;
+    }
+
+    public List<SocialAccount> getSocialAccounts() {
+        return Collections.unmodifiableList(socialAccounts);
+    }
+
+    void addSocialAccount(SocialAccount socialAccount) {
+        socialAccounts.add(socialAccount);
     }
 }

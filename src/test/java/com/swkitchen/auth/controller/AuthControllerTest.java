@@ -11,14 +11,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.swkitchen.TestcontainersConfig;
-import com.swkitchen.auth.domain.Account;
-import com.swkitchen.auth.domain.AccountStatus;
 import com.swkitchen.auth.domain.RefreshToken;
-import com.swkitchen.auth.domain.Role;
-import com.swkitchen.auth.repository.AccountRepository;
 import com.swkitchen.auth.repository.RefreshTokenRepository;
-import com.swkitchen.common.security.TurnstileClient;
 import com.swkitchen.common.security.SecurityProperties;
+import com.swkitchen.common.security.TurnstileClient;
+import com.swkitchen.member.domain.Account;
+import com.swkitchen.member.domain.AccountStatus;
+import com.swkitchen.member.domain.Role;
+import com.swkitchen.member.repository.AccountRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.Cookie;

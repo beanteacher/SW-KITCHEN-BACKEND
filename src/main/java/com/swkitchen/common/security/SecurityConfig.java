@@ -1,5 +1,7 @@
 package com.swkitchen.common.security;
 
+import com.swkitchen.common.audit.PrivacyAuditFilter;
+import com.swkitchen.common.audit.PrivacyAuditLogger;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -22,6 +24,7 @@ public class SecurityConfig {
     private final JwtProvider jwtProvider;
     private final SecurityProperties properties;
     private final SecurityErrorHandler errorHandler;
+    private final PrivacyAuditLogger auditLogger;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -41,10 +44,16 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health", "/error").permitAll()
                 // API 문서. 운영은 application-prod.yml 에서 꺼서 이 주소가 없다
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                .requestMatchers("/api/v1/admin/**").hasAuthority("PRODUCT_MANAGE")
+                .requestMatchers("/api/v1/admin/product/**", "/api/v1/admin/category/**", "/api/v1/admin/image/**")
+                    .hasAuthority("PRODUCT_MANAGE")
+                .requestMatchers("/api/v1/admin/member/**").hasAuthority("MEMBER_READ")
+                .requestMatchers("/api/v1/admin/staff/**").hasAuthority("STAFF_MANAGE")
+                // 새 백오피스 경로는 권한을 정해 위에 더하기 전까지 막는다
+                .requestMatchers("/api/v1/admin/**").denyAll()
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e.authenticationEntryPoint(errorHandler).accessDeniedHandler(errorHandler))
             .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, properties), UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(new PrivacyAuditFilter(auditLogger), JwtAuthenticationFilter.class)
             .build();
     }
 

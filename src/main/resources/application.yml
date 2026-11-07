@@ -33,9 +33,9 @@ security:
     refresh-token-ttl: 14d
   # API 는 역할이 아니라 권한을 검사한다. 역할을 바꿀 때는 여기만 고친다
   role-permissions:
-    CUSTOMER: []
-    STAFF: [PRODUCT_MANAGE]
-    ADMIN: [PRODUCT_MANAGE]
+    CUSTOMER: [MEMBER_SELF]
+    STAFF: [PRODUCT_MANAGE, MEMBER_READ]
+    ADMIN: [PRODUCT_MANAGE, MEMBER_READ, STAFF_MANAGE]
 
 # 이미지 공개 주소 앞부분 (스토리지 또는 CDN). 뒤에 키를 붙인다
 

@@ -13,6 +13,7 @@ import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.JPQLSubQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.swkitchen.common.repository.LikePattern;
 import com.swkitchen.product.domain.Material;
 import com.swkitchen.product.domain.Product;
 import com.swkitchen.product.domain.SalesType;
@@ -27,9 +28,6 @@ import org.springframework.data.domain.Pageable;
 
 @RequiredArgsConstructor
 public class ProductRepositoryImpl implements ProductRepositoryCustom {
-
-    // MySQL 은 문자열 안의 \ 를 따로 해석해서, LIKE 이스케이프 문자로 ! 를 쓴다
-    private static final char LIKE_ESCAPE = '!';
 
     private final JPAQueryFactory queryFactory;
 
@@ -154,9 +152,9 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
         if (keyword == null) {
             return null;
         }
-        String pattern = likePattern(keyword);
-        BooleanExpression matches = product.name.like(pattern, LIKE_ESCAPE)
-            .or(product.manufacturer.like(pattern, LIKE_ESCAPE));
+        String pattern = LikePattern.contains(keyword);
+        BooleanExpression matches = product.name.like(pattern, LikePattern.ESCAPE)
+            .or(product.manufacturer.like(pattern, LikePattern.ESCAPE));
         BooleanExpression codeLike = productCodeLike(keyword);
         // 조건 없이 optionExists 를 부르면 옵션이 있는 모든 제품이 맞는다
         return codeLike == null ? matches : matches.or(optionExists(codeLike));
@@ -192,10 +190,10 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
         if (keyword == null) {
             return null;
         }
-        String pattern = likePattern(keyword);
+        String pattern = LikePattern.contains(keyword);
         BooleanExpression optionMatches = optionExists(
-            productOption.modelName.like(pattern, LIKE_ESCAPE).or(productCodeLike(keyword)));
-        return product.name.like(pattern, LIKE_ESCAPE).or(optionMatches);
+            productOption.modelName.like(pattern, LikePattern.ESCAPE).or(productCodeLike(keyword)));
+        return product.name.like(pattern, LikePattern.ESCAPE).or(optionMatches);
     }
 
     /** 이 제품의 옵션 중 조건에 맞는 것이 있다 */
@@ -215,7 +213,7 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
         if (!StandardCharsets.US_ASCII.newEncoder().canEncode(keyword)) {
             return null;
         }
-        return productOption.productCode.like(likePattern(keyword.toUpperCase(Locale.ROOT)), LIKE_ESCAPE);
+        return productOption.productCode.like(LikePattern.contains(keyword.toUpperCase(Locale.ROOT)), LikePattern.ESCAPE);
     }
 
     /** 대분류면 그 아래 중분류 전부, 중분류면 그 중분류만 */
@@ -240,12 +238,4 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
         return product.salesType.in(salesTypes);
     }
 
-    /** 부분 일치. 검색어의 % _ 는 글자 그대로 찾게 한다 */
-    private static String likePattern(String keyword) {
-        String escaped = keyword
-            .replace("!", "!!")
-            .replace("%", "!%")
-            .replace("_", "!_");
-        return "%" + escaped + "%";
-    }
-}
+    /** 부분 일치. 검색어의 % _ 는 글자 그대로 찾게 한다 */}

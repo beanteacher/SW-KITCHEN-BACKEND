@@ -1,6 +1,6 @@
 package com.swkitchen.common.security;
 
-import com.swkitchen.auth.domain.Role;
+import com.swkitchen.member.domain.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
