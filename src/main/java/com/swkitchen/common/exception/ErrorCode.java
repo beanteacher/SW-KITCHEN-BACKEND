@@ -18,6 +18,11 @@ public enum ErrorCode {
     LOGIN_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "로그인 시도가 너무 많습니다. 10분 뒤에 다시 시도해 주세요."),
     // 비밀번호가 맞을 때만 알린다
     ACCOUNT_SUSPENDED(HttpStatus.FORBIDDEN, "정지된 계정입니다. 관리자에게 문의해 주세요."),
+    // 업체 결과가 완료가 아님, 10분 지남, 이미 쓴 건
+    IDENTITY_VERIFICATION_FAILED(HttpStatus.BAD_REQUEST, "본인확인을 마치지 못했습니다. 다시 시도해 주세요."),
+    // 401 이면 화면이 토큰을 새로 받으러 가므로 400 으로 둔다
+    IDENTITY_VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "본인확인 시간이 지났습니다. 다시 본인확인해 주세요."),
+    UNDER_AGE(HttpStatus.BAD_REQUEST, "만 14세 미만은 가입할 수 없습니다."),
     USER_ID_DUPLICATE(HttpStatus.CONFLICT, "이미 쓰고 있는 아이디입니다."),
     STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "직원 계정을 찾을 수 없습니다."),
     SELF_CHANGE_NOT_ALLOWED(HttpStatus.CONFLICT, "자기 계정은 정지하거나 역할을 바꿀 수 없습니다."),

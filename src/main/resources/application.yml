@@ -37,6 +37,10 @@ security:
     STAFF: [PRODUCT_MANAGE, MEMBER_READ]
     ADMIN: [PRODUCT_MANAGE, MEMBER_READ, STAFF_MANAGE]
 
+# 본인확인(포트원 + KCP) API 비밀 키. 로컬은 비워 두면 본인확인이 늘 실패한다
+portone:
+  api-secret: ""
+
 # 이미지 공개 주소 앞부분 (스토리지 또는 CDN). 뒤에 키를 붙인다
 
 storage:

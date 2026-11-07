@@ -27,3 +27,7 @@ image:
 storage:
   bucket: sw-kitchen
   endpoint: http://localhost:4566
+# 로컬 전용 키 (base64 32바이트). 운영은 환경 변수로 다른 값을 넣는다
+encryption:
+  privacy-key: bG9jYWwtb25seS1wcml2YWN5LWtleS0wMTIzNDU2Nzg=
+  cookie-key: bG9jYWwtb25seS1jb29raWUta2V5LTAxMjM0NTY3ODk=

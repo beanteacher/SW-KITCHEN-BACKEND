@@ -15,6 +15,12 @@ security:
   captcha:
     secret-key: ${TURNSTILE_SECRET_KEY}
 
+encryption:
+  privacy-key: ${PRIVACY_ENCRYPTION_KEY}
+  cookie-key: ${COOKIE_ENCRYPTION_KEY}
+portone:
+  api-secret: ${PORTONE_API_SECRET}
+
 image:
   base-url: ${IMAGE_BASE_URL}
 storage:

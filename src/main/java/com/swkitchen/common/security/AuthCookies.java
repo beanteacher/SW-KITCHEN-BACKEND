@@ -5,17 +5,19 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
-/** 토큰은 자바스크립트가 읽지 못하는 쿠키로만 주고받는다 */
+/** 토큰·본인확인 결과는 자바스크립트가 읽지 못하는 쿠키로만 주고받는다 */
 @Component
 @RequiredArgsConstructor
 public class AuthCookies {
 
     public static final String ACCESS_TOKEN = "access_token";
     public static final String REFRESH_TOKEN = "refresh_token";
+    public static final String VERIFIED_IDENTITY = "verified_identity";
 
     // 리프레시 토큰은 인증 API 에만 실려 가게 경로를 좁힌다
     private static final String ACCESS_PATH = "/";
     private static final String REFRESH_PATH = "/api/v1/auth";
+    private static final String API_PATH = "/api/v1";
 
     private final SecurityProperties properties;
 
@@ -33,6 +35,14 @@ public class AuthCookies {
 
     public ResponseCookie clearRefreshToken() {
         return build(REFRESH_TOKEN, "", REFRESH_PATH, Duration.ZERO);
+    }
+
+    public ResponseCookie verifiedIdentity(String sealed, Duration maxAge) {
+        return build(VERIFIED_IDENTITY, sealed, API_PATH, maxAge);
+    }
+
+    public ResponseCookie clearVerifiedIdentity() {
+        return build(VERIFIED_IDENTITY, "", API_PATH, Duration.ZERO);
     }
 
     private ResponseCookie build(String name, String value, String path, Duration maxAge) {
