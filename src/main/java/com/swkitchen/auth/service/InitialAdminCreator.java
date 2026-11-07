@@ -18,6 +18,8 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class InitialAdminCreator implements ApplicationRunner {
 
+    private static final String INITIAL_ADMIN_NAME = "관리자";
+
     private final AccountRepository accountRepository;
     private final PasswordEncoder passwordEncoder;
     private final SecurityProperties properties;
@@ -31,7 +33,11 @@ public class InitialAdminCreator implements ApplicationRunner {
         if (accountRepository.count() > 0) {
             return;
         }
-        accountRepository.save(Account.create(admin.userId(), passwordEncoder.encode(admin.password()), Role.ADMIN));
+        accountRepository.save(Account.create(
+            admin.userId(),
+            passwordEncoder.encode(admin.password()),
+            INITIAL_ADMIN_NAME,
+            Role.ADMIN));
         log.info("첫 관리자 계정을 만들었습니다: {}", admin.userId());
     }
 }

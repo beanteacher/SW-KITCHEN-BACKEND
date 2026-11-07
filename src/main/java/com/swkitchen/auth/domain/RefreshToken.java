@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -33,6 +34,8 @@ public class RefreshToken {
     @Column(nullable = false)
     private LocalDateTime expiresAt;
 
+    private LocalDateTime rotatedAt;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -47,5 +50,16 @@ public class RefreshToken {
 
     public boolean isExpired(LocalDateTime now) {
         return !expiresAt.isAfter(now);
+    }
+
+    public boolean isRotatedBefore(LocalDateTime now, Duration graceTime) {
+        return rotatedAt != null && !rotatedAt.plus(graceTime).isAfter(now);
+    }
+
+    // 처음 바뀐 시각만 남겨, 그 안에 다시 와도 기한이 늘지 않게 한다
+    public void markRotated(LocalDateTime now) {
+        if (rotatedAt == null) {
+            this.rotatedAt = now;
+        }
     }
 }

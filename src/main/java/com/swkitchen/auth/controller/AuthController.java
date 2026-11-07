@@ -6,6 +6,7 @@ import com.swkitchen.auth.dto.AuthDto;
 import com.swkitchen.auth.service.AuthService;
 import com.swkitchen.common.dto.ApiResponse;
 import com.swkitchen.common.security.AuthCookies;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -29,8 +30,11 @@ public class AuthController {
     private final AuthCookies authCookies;
 
     @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ApiResponse<AuthDto.LoginResponse>> login(@Valid @RequestBody AuthDto.LoginRequest request) {
-        AuthDto.LoginResult result = authService.login(request);
+    public ResponseEntity<ApiResponse<AuthDto.LoginResponse>> login(
+            @Valid @RequestBody AuthDto.LoginRequest request,
+            HttpServletRequest httpRequest) {
+        // 앞에 프록시를 두면 프록시가 넘기는 원래 IP 로 바꿔야 한다
+        AuthDto.LoginResult result = authService.login(request, httpRequest.getRemoteAddr());
 
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, authCookies.accessToken(result.accessToken()).toString())

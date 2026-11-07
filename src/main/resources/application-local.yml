@@ -19,6 +19,9 @@ security:
   initial-admin:
     user-id: admin
     password: "1234"   # 이 비밀번호로 로그인하면 변경 안내가 뜬다
+  # Cloudflare 가 주는 테스트용 키. 어떤 보안문자 값이든 통과한다
+  captcha:
+    secret-key: 1x0000000000000000000000000000000AA
 image:
   base-url: http://localhost:4566/sw-kitchen   # docker compose 의 LocalStack
 storage:

@@ -19,22 +19,32 @@ import org.hibernate.annotations.UpdateTimestamp;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Account {
 
+    private static final int CAPTCHA_FAIL_COUNT = 5;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private String userId;
 
-    @Column(length = 255)
-    private String email;
-
-    @Column(nullable = false, length = 100)
+    // 소셜로만 가입한 고객은 아이디·비밀번호가 없다
+    @Column(length = 100)
     private String passwordHash;
+
+    @Column(nullable = false, length = 50)
+    private String name;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private Role role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private AccountStatus status;
+
+    @Column(nullable = false)
+    private int loginFailCount;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -44,12 +54,26 @@ public class Account {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    public static Account create(String userId, String passwordHash, Role role) {
+    public static Account create(String userId, String passwordHash, String name, Role role) {
         Account account = new Account();
         account.userId = userId;
         account.passwordHash = passwordHash;
+        account.name = name;
         account.role = role;
+        account.status = AccountStatus.ACTIVE;
         return account;
+    }
+
+    public boolean isCaptchaRequired() {
+        return loginFailCount >= CAPTCHA_FAIL_COUNT;
+    }
+
+    public boolean isSuspended() {
+        return status == AccountStatus.SUSPENDED;
+    }
+
+    public void resetLoginFailCount() {
+        this.loginFailCount = 0;
     }
 
     public void changePassword(String passwordHash) {

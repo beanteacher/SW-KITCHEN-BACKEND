@@ -12,6 +12,8 @@ security:
   initial-admin:
     user-id: ${ADMIN_USER_ID:}
     password: ${ADMIN_PASSWORD:}
+  captcha:
+    secret-key: ${TURNSTILE_SECRET_KEY}
 
 image:
   base-url: ${IMAGE_BASE_URL}

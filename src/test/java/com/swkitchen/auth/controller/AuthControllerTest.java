@@ -1,6 +1,7 @@
 package com.swkitchen.auth.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,9 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.swkitchen.TestcontainersConfig;
 import com.swkitchen.auth.domain.Account;
+import com.swkitchen.auth.domain.AccountStatus;
+import com.swkitchen.auth.domain.RefreshToken;
 import com.swkitchen.auth.domain.Role;
 import com.swkitchen.auth.repository.AccountRepository;
 import com.swkitchen.auth.repository.RefreshTokenRepository;
+import com.swkitchen.common.security.TurnstileClient;
 import com.swkitchen.common.security.SecurityProperties;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -21,8 +25,10 @@ import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.HexFormat;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,6 +39,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -60,9 +68,18 @@ class AuthControllerTest {
     @Autowired
     SecurityProperties properties;
 
+    @MockitoBean
+    TurnstileClient turnstileClient;
+
+    Account staff;
+
+    // IP 시도 제한은 테스트끼리 나눠 쓰므로 테스트마다 다른 IP 로 보낸다
+    String ip;
+
     @BeforeEach
     void setUp() {
-        accountRepository.save(Account.create("staff1", passwordEncoder.encode("pass1234"), Role.STAFF));
+        staff = accountRepository.save(Account.create("staff1", passwordEncoder.encode("pass1234"), "박담당", Role.STAFF));
+        ip = "test-" + UUID.randomUUID();
     }
 
     @Test
@@ -72,6 +89,7 @@ class AuthControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.userId").value("staff1"))
+            .andExpect(jsonPath("$.data.name").value("박담당"))
             .andExpect(jsonPath("$.data.role").value("STAFF"))
             .andExpect(jsonPath("$.data.passwordChangeRecommended").value(false))
             .andExpect(jsonPath("$.data.passwordHash").doesNotExist())
@@ -117,13 +135,14 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("내 정보: 로그인하면 id·아이디·역할을 주고, 로그인 안 하면 401 UNAUTHORIZED")
+    @DisplayName("내 정보: 로그인하면 id·아이디·이름·역할을 주고, 로그인 안 하면 401 UNAUTHORIZED")
     void me() throws Exception {
         Cookie access = login("staff1", "pass1234").andReturn().getResponse().getCookie("access_token");
 
         mvc.perform(get("/api/v1/auth/me").cookie(access))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.userId").value("staff1"))
+            .andExpect(jsonPath("$.data.name").value("박담당"))
             .andExpect(jsonPath("$.data.role").value("STAFF"))
             .andExpect(jsonPath("$.data.passwordChangeRecommended").doesNotExist());
         mvc.perform(get("/api/v1/auth/me"))
@@ -132,11 +151,11 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("재발급: 리프레시 토큰 쿠키로 두 토큰을 새로 받고, 쓴 리프레시 토큰은 다시 못 쓴다")
+    @DisplayName("재발급: 리프레시 토큰 쿠키로 두 토큰을 새로 받고, 쓴 토큰은 바뀐 시각이 적힌 채 남는다")
     void refresh() throws Exception {
         Cookie oldRefresh = login("staff1", "pass1234").andReturn().getResponse().getCookie("refresh_token");
 
-        MvcResult refreshed = mvc.perform(post("/api/v1/auth/refresh").cookie(oldRefresh))
+        MvcResult refreshed = refresh(oldRefresh)
             .andExpect(status().isOk())
             .andExpect(cookie().httpOnly("access_token", true))
             .andExpect(cookie().path("refresh_token", "/api/v1/auth"))
@@ -145,14 +164,80 @@ class AuthControllerTest {
         Cookie newRefresh = refreshed.getResponse().getCookie("refresh_token");
 
         assertThat(newRefresh.getValue()).isNotEqualTo(oldRefresh.getValue());
-        assertThat(refreshTokenRepository.findByTokenHash(sha256(oldRefresh.getValue()))).isEmpty();
+        assertThat(refreshTokenRepository.findByTokenHash(sha256(oldRefresh.getValue())))
+            .get().extracting(RefreshToken::getRotatedAt).isNotNull();
         assertThat(refreshTokenRepository.findByTokenHash(sha256(newRefresh.getValue()))).isPresent();
         mvc.perform(get("/api/v1/auth/me").cookie(newAccess))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.userId").value("staff1"));
-        mvc.perform(post("/api/v1/auth/refresh").cookie(oldRefresh))
+    }
+
+    @Test
+    @DisplayName("재발급: 여러 탭이 같은 토큰으로 30초 안에 재발급하면 모두 받고, 30초가 지나면 401")
+    void refreshFromManyTabs() throws Exception {
+        Cookie shared = login("staff1", "pass1234").andReturn().getResponse().getCookie("refresh_token");
+
+        refresh(shared).andExpect(status().isOk());
+        refresh(shared).andExpect(status().isOk());
+
+        RefreshToken token = refreshTokenRepository.findByTokenHash(sha256(shared.getValue())).orElseThrow();
+        ReflectionTestUtils.setField(token, "rotatedAt", LocalDateTime.now().minusSeconds(31));
+        refresh(shared)
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("재발급: 정지한 계정은 이미 로그인한 기기도 401")
+    void refreshSuspended() throws Exception {
+        Cookie refresh = login("staff1", "pass1234").andReturn().getResponse().getCookie("refresh_token");
+        ReflectionTestUtils.setField(staff, "status", AccountStatus.SUSPENDED);
+
+        refresh(refresh)
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("보안문자: 5번 틀리면 6번째는 맞는 비밀번호여도 400 CAPTCHA_REQUIRED, 보안문자를 맞히면 로그인되고 그 뒤로는 보안문자가 필요 없다")
+    void captchaAfterFiveFailures() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            login("staff1", "wrong-pass").andExpect(status().isUnauthorized());
+        }
+
+        login("staff1", "pass1234")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("CAPTCHA_REQUIRED"));
+
+        given(turnstileClient.verify("captcha-token", ip)).willReturn(true);
+        login("staff1", "pass1234", "captcha-token").andExpect(status().isOk());
+        login("staff1", "pass1234").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("IP 제한: 한 IP 에서 1분에 20번을 넘으면 429 LOGIN_RATE_LIMITED, 맞는 비밀번호여도 막힌다")
+    void rateLimited() throws Exception {
+        for (int i = 0; i < 20; i++) {
+            login("nobody", "pass1234").andExpect(status().isUnauthorized());
+        }
+
+        login("staff1", "pass1234")
+            .andExpect(status().isTooManyRequests())
+            .andExpect(jsonPath("$.code").value("LOGIN_RATE_LIMITED"));
+    }
+
+    @Test
+    @DisplayName("정지한 계정: 비밀번호가 맞으면 403 ACCOUNT_SUSPENDED, 틀리면 401 LOGIN_FAILED")
+    void suspended() throws Exception {
+        ReflectionTestUtils.setField(staff, "status", AccountStatus.SUSPENDED);
+
+        login("staff1", "pass1234")
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("ACCOUNT_SUSPENDED"))
+            .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+        login("staff1", "wrong-pass")
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
     }
 
     @Test
@@ -185,7 +270,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("로그아웃은 다른 계정의 리프레시 토큰을 지우지 못한다")
     void logoutCannotDeleteOthersToken() throws Exception {
-        accountRepository.save(Account.create("staff2", passwordEncoder.encode("pass1234"), Role.STAFF));
+        accountRepository.save(Account.create("staff2", passwordEncoder.encode("pass1234"), "이담당", Role.STAFF));
         Cookie othersRefresh = login("staff2", "pass1234").andReturn().getResponse().getCookie("refresh_token");
         Cookie myAccess = login("staff1", "pass1234").andReturn().getResponse().getCookie("access_token");
 
@@ -322,9 +407,22 @@ class AuthControllerTest {
     }
 
     private ResultActions login(String userId, String password) throws Exception {
+        return login(userId, password, null);
+    }
+
+    private ResultActions login(String userId, String password, String captchaToken) throws Exception {
+        String captcha = captchaToken == null ? "" : ",\"captchaToken\":\"" + captchaToken + "\"";
         return mvc.perform(post("/api/v1/auth/login")
+            .with(request -> {
+                request.setRemoteAddr(ip);
+                return request;
+            })
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"userId\":\"" + userId + "\",\"password\":\"" + password + "\"}"));
+            .content("{\"userId\":\"" + userId + "\",\"password\":\"" + password + "\"" + captcha + "}"));
+    }
+
+    private ResultActions refresh(Cookie refreshToken) throws Exception {
+        return mvc.perform(post("/api/v1/auth/refresh").cookie(refreshToken));
     }
 
     private static String sha256(String value) throws Exception {
