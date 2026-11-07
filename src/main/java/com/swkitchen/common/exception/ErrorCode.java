@@ -31,6 +31,8 @@ public enum ErrorCode {
     NO_PASSWORD_ACCOUNT(HttpStatus.CONFLICT, "카카오·네이버로 가입한 계정은 비밀번호가 없습니다."),
     // 소셜로만 가입한 계정이 소셜 로그인을 다시 하지 않고 탈퇴
     REAUTH_REQUIRED(HttpStatus.BAD_REQUEST, "탈퇴하려면 가입한 소셜 계정으로 다시 로그인해 주세요."),
+    SOCIAL_SIGNUP_EXPIRED(HttpStatus.BAD_REQUEST, "시간이 지났습니다. 카카오·네이버 로그인부터 다시 해 주세요."),
+    SOCIAL_ALREADY_LINKED(HttpStatus.CONFLICT, "이 계정에는 이미 다른 소셜 계정이 연결되어 있습니다."),
     USER_ID_DUPLICATE(HttpStatus.CONFLICT, "이미 쓰고 있는 아이디입니다."),
     STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "직원 계정을 찾을 수 없습니다."),
     SELF_CHANGE_NOT_ALLOWED(HttpStatus.CONFLICT, "자기 계정은 정지하거나 역할을 바꿀 수 없습니다."),

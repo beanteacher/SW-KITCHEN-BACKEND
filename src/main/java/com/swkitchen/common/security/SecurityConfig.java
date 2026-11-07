@@ -41,7 +41,12 @@ public class SecurityConfig {
                 .requestMatchers(SecurityConfig::isUploadWithoutAjaxHeader).denyAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/product/**", "/api/v1/category/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/v1/identity-verification", "/api/v1/member").permitAll()
+                .requestMatchers(HttpMethod.POST,
+                    "/api/v1/identity-verification",
+                    "/api/v1/member",
+                    "/api/v1/member/social",
+                    "/api/v1/member/social/link").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/member/user-id-check", "/api/v1/member/find-id").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/member/password-reset").permitAll()
                 .requestMatchers("/actuator/health", "/error").permitAll()

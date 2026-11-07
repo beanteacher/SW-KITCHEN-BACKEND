@@ -1,11 +1,13 @@
 package com.swkitchen.member.controller;
 
+import static com.swkitchen.common.security.AuthCookies.SOCIAL_REAUTH;
 import static com.swkitchen.common.security.AuthCookies.VERIFIED_IDENTITY;
 
 import com.swkitchen.common.dto.ApiResponse;
 import com.swkitchen.common.security.AuthCookies;
 import com.swkitchen.member.dto.MyPageDto;
 import com.swkitchen.member.service.MyPageService;
+import com.swkitchen.member.service.SocialLoginService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class MyPageController {
 
     private final MyPageService myPageService;
+    private final SocialLoginService socialLoginService;
     private final AuthCookies authCookies;
 
     @GetMapping
@@ -58,13 +61,15 @@ public class MyPageController {
     @PostMapping(value = "/withdraw", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<Void>> withdraw(
             @AuthenticationPrincipal Long accountId,
+            @CookieValue(name = SOCIAL_REAUTH, required = false) String socialReauth,
             @Valid @RequestBody MyPageDto.WithdrawRequest request) {
-        myPageService.withdraw(accountId, request, false);
+        myPageService.withdraw(accountId, request, socialLoginService.isReauthenticated(socialReauth, accountId));
 
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, authCookies.clearAccessToken().toString())
             .header(HttpHeaders.SET_COOKIE, authCookies.clearRefreshToken().toString())
             .header(HttpHeaders.SET_COOKIE, authCookies.clearVerifiedIdentity().toString())
+            .header(HttpHeaders.SET_COOKIE, authCookies.clearSocialReauth().toString())
             .body(ApiResponse.success(null));
     }
 }

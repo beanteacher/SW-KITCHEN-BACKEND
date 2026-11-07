@@ -41,6 +41,16 @@ security:
 portone:
   api-secret: ""
 
+# 카카오·네이버 로그인. 키는 각 개발자 센터에서 받는다
+oauth:
+  redirect-base-url: http://localhost:3000
+  kakao:
+    client-id: ""
+    client-secret: ""
+  naver:
+    client-id: ""
+    client-secret: ""
+
 # 이미지 공개 주소 앞부분 (스토리지 또는 CDN). 뒤에 키를 붙인다
 
 storage:

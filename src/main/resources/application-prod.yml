@@ -20,6 +20,14 @@ encryption:
   cookie-key: ${COOKIE_ENCRYPTION_KEY}
 portone:
   api-secret: ${PORTONE_API_SECRET}
+oauth:
+  redirect-base-url: ${SITE_URL}
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID}
+    client-secret: ${KAKAO_CLIENT_SECRET}
+  naver:
+    client-id: ${NAVER_CLIENT_ID}
+    client-secret: ${NAVER_CLIENT_SECRET}
 
 image:
   base-url: ${IMAGE_BASE_URL}
