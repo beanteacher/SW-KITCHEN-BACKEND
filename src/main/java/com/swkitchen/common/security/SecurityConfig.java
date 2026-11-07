@@ -41,7 +41,8 @@ public class SecurityConfig {
                 .requestMatchers(SecurityConfig::isUploadWithoutAjaxHeader).denyAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/product/**", "/api/v1/category/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/v1/identity-verification").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/identity-verification", "/api/v1/member").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/member/user-id-check").permitAll()
                 .requestMatchers("/actuator/health", "/error").permitAll()
                 // API 문서. 운영은 application-prod.yml 에서 꺼서 이 주소가 없다
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()

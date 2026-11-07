@@ -23,6 +23,8 @@ public enum ErrorCode {
     // 401 이면 화면이 토큰을 새로 받으러 가므로 400 으로 둔다
     IDENTITY_VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "본인확인 시간이 지났습니다. 다시 본인확인해 주세요."),
     UNDER_AGE(HttpStatus.BAD_REQUEST, "만 14세 미만은 가입할 수 없습니다."),
+    // 같은 사람(CI)의 고객 계정이 이미 있다. 화면이 본인확인 결과로 미리 안내하므로 동시에 두 번 가입할 때만 난다
+    ACCOUNT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 가입한 계정이 있습니다."),
     USER_ID_DUPLICATE(HttpStatus.CONFLICT, "이미 쓰고 있는 아이디입니다."),
     STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "직원 계정을 찾을 수 없습니다."),
     SELF_CHANGE_NOT_ALLOWED(HttpStatus.CONFLICT, "자기 계정은 정지하거나 역할을 바꿀 수 없습니다."),

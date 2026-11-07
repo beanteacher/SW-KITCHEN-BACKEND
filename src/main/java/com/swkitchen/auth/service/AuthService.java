@@ -60,13 +60,13 @@ public class AuthService {
         }
 
         account.resetLoginFailCount();
-        String token = createRefreshToken(account);
 
-        return AuthDto.LoginResult.of(
-            account,
-            isInitialPassword(request.password()),
-            jwtProvider.createAccessToken(account.getId(), account.getRole()),
-            token);
+        return issueLogin(account, isInitialPassword(request.password()));
+    }
+
+    /** 가입·소셜 로그인처럼 비밀번호 확인 없이 들어오는 곳에서 로그인 토큰을 준다 */
+    public AuthDto.LoginResult issueLogin(Account account) {
+        return issueLogin(account, false);
     }
 
     @Transactional(readOnly = true)
@@ -128,6 +128,16 @@ public class AuthService {
         } else {
             refreshTokenRepository.deleteByAccountId(accountId);
         }
+    }
+
+    private AuthDto.LoginResult issueLogin(Account account, boolean passwordChangeRecommended) {
+        String token = createRefreshToken(account);
+
+        return AuthDto.LoginResult.of(
+            account,
+            passwordChangeRecommended,
+            jwtProvider.createAccessToken(account.getId(), account.getRole()),
+            token);
     }
 
     // 원문은 쿠키로 돌려주고 DB 에는 해시만 둔다
