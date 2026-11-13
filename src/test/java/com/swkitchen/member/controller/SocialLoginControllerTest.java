@@ -119,7 +119,7 @@ class SocialLoginControllerTest {
     @Test
     @DisplayName("처음 온 카카오 계정: 가입 화면으로 보내고, 본인확인·동의를 마치면 아이디 없는 계정으로 가입·로그인된다")
     void socialSignup() throws Exception {
-        Cookie social = callback("kakao-new", "/").andExpect(header().string("Location", "/signup/social"))
+        Cookie social = callback("kakao-new", "/").andExpect(header().string("Location", "/signup/social?provider=kakao"))
             .andReturn().getResponse().getCookie("social_signup");
         Cookie verified = IdentityCookies.verify(mvc, identityVerifier, "ci-lee", "SIGNUP");
 

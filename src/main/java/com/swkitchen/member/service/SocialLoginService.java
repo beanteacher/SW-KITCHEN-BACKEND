@@ -100,7 +100,8 @@ public class SocialLoginService {
         }
         String signup = sealedCookieCodec.seal(
             new SocialLoginDto.SocialSignup(provider, providerUserId.get(), Instant.now().plus(SIGNUP_TIME)));
-        return new SocialLoginDto.CallbackResult(SIGNUP_PAGE, null, signup, null);
+        // 쿠키는 화면이 못 읽으므로, 시간이 지났을 때 어느 소셜로 다시 시작할지 주소로 알려 준다
+        return new SocialLoginDto.CallbackResult(SIGNUP_PAGE + "?provider=" + provider.name().toLowerCase(), null, signup, null);
     }
 
     /** 소셜로 새로 가입한다. 아이디·비밀번호가 없는 계정이다 */
