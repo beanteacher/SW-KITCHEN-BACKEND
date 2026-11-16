@@ -9,6 +9,7 @@ import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -16,18 +17,24 @@ import org.springframework.stereotype.Component;
 @Component
 public class LoginRateLimiter {
 
-    private static final int MAX_ATTEMPTS = 20;
+    private static final int DEFAULT_MAX_ATTEMPTS = 20;
     private static final Duration WINDOW = Duration.ofMinutes(1);
     private static final Duration BLOCK_TIME = Duration.ofMinutes(10);
 
     private final Map<String, Attempts> attemptsByIp = new ConcurrentHashMap<>();
+    // 1분에 받는 시도 수. 운영은 20 이고, 로컬은 E2E 가 한 컴퓨터에서 여러 번 로그인해 넉넉히 둔다
+    private final int maxAttempts;
+
+    public LoginRateLimiter(@Value("${security.login-attempts-per-minute:" + DEFAULT_MAX_ATTEMPTS + "}") int maxAttempts) {
+        this.maxAttempts = maxAttempts;
+    }
 
     public void check(String ip) {
         check(ip, Instant.now());
     }
 
     void check(String ip, Instant now) {
-        Attempts attempts = attemptsByIp.computeIfAbsent(ip, key -> new Attempts());
+        Attempts attempts = attemptsByIp.computeIfAbsent(ip, key -> new Attempts(maxAttempts));
         if (!attempts.tryAcquire(now)) {
             throw new AppException(ErrorCode.LOGIN_RATE_LIMITED);
         }
@@ -49,8 +56,13 @@ public class LoginRateLimiter {
 
     private static class Attempts {
 
+        private final int maxAttempts;
         private final Deque<Instant> times = new ArrayDeque<>();
         private Instant blockedUntil = Instant.MIN;
+
+        Attempts(int maxAttempts) {
+            this.maxAttempts = maxAttempts;
+        }
 
         synchronized boolean tryAcquire(Instant now) {
             if (now.isBefore(blockedUntil)) {
@@ -58,7 +70,7 @@ public class LoginRateLimiter {
             }
             dropOld(now);
             times.addLast(now);
-            if (times.size() > MAX_ATTEMPTS) {
+            if (times.size() > maxAttempts) {
                 blockedUntil = now.plus(BLOCK_TIME);
                 times.clear();
                 return false;

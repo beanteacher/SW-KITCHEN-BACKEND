@@ -14,7 +14,7 @@ class LoginRateLimiterTest {
 
     private static final Instant START = Instant.parse("2026-11-07T01:00:00Z");
 
-    LoginRateLimiter limiter = new LoginRateLimiter();
+    LoginRateLimiter limiter = new LoginRateLimiter(20);
 
     @Test
     @DisplayName("1분에 20번까지는 받고, 21번째부터 막는다")

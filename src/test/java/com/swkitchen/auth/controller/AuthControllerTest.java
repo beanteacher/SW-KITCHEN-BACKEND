@@ -47,7 +47,8 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 // 테스트는 로컬 설정으로 켜지지만, 쿠키 모양은 운영(Secure 켬)과 같게 확인한다
-@SpringBootTest(properties = "security.cookie-secure=true")
+// 시도 상한은 로컬 설정(넉넉함) 대신 운영 값으로 확인한다
+@SpringBootTest(properties = {"security.cookie-secure=true", "security.login-attempts-per-minute=20"})
 @AutoConfigureMockMvc
 @Import(TestcontainersConfig.class)
 @Transactional
