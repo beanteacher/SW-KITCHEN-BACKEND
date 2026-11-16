@@ -37,4 +37,33 @@ class PortOneIdentityVerifierTest {
             new PortOneIdentityVerifier.Customer("ci", "김주방", "OTHER", LocalDate.of(1990, 5, 12), "01012345678"),
             VERIFIED_AT).toVerifiedPerson()).isEmpty();
     }
+
+    // KCP 시뮬레이터가 실제로 준 모양: 인증 완료, CI·이름·생년월일은 있고 휴대폰 번호·성별은 비어 있다
+    static final PortOneIdentityVerifier.Response SIMULATOR = new PortOneIdentityVerifier.Response(
+        "iv-1",
+        "VERIFIED",
+        new PortOneIdentityVerifier.Customer("simulator__ci_value", "홍길동", null, LocalDate.of(2001, 1, 1), null),
+        VERIFIED_AT);
+
+    @Test
+    @DisplayName("시뮬레이터 결과는 그대로면 쓸 수 없고, 빈 칸으로 휴대폰 번호와 성별을 알려 준다")
+    void simulatorAsIs() {
+        assertThat(SIMULATOR.toVerifiedPerson()).isEmpty();
+        assertThat(SIMULATOR.blankFields()).containsExactly("phoneNumber", "gender");
+    }
+
+    @Test
+    @DisplayName("빈 칸 채우기를 켜면 시뮬레이터 결과도 테스트 휴대폰 번호·남성으로 통과한다")
+    void simulatorFilled() {
+        assertThat(SIMULATOR.withSimulatorBlanksFilled().toVerifiedPerson()).contains(new VerifiedPerson(
+            "iv-1", "simulator__ci_value", "홍길동", LocalDate.of(2001, 1, 1), "M", "01000000000", VERIFIED_AT));
+    }
+
+    @Test
+    @DisplayName("빈 칸 채우기는 이미 있는 값을 바꾸지 않는다")
+    void fillKeepsRealValues() {
+        var response = new PortOneIdentityVerifier.Response("iv-1", "VERIFIED", CUSTOMER, VERIFIED_AT);
+
+        assertThat(response.withSimulatorBlanksFilled()).isEqualTo(response);
+    }
 }

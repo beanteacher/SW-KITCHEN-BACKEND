@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,9 @@ public class PortOneIdentityVerifier implements IdentityVerifier {
 
     private static final String BASE_URL = "https://api.portone.io";
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
+    // 시뮬레이터가 비워 주는 칸에 넣는 테스트 값 (fillSimulatorBlanks 를 켰을 때만)
+    private static final String SIMULATOR_PHONE = "01000000000";
+    private static final String SIMULATOR_GENDER = "MALE";
     private static final RestClient REST_CLIENT = RestClient.builder()
         .baseUrl(BASE_URL)
         .requestFactory(requestFactory())
@@ -35,7 +40,18 @@ public class PortOneIdentityVerifier implements IdentityVerifier {
                 .header("Authorization", "PortOne " + properties.apiSecret())
                 .retrieve()
                 .body(Response.class);
-            return Optional.ofNullable(response).flatMap(Response::toVerifiedPerson);
+            if (response == null) {
+                return Optional.empty();
+            }
+            if (properties.fillSimulatorBlanks()) {
+                response = response.withSimulatorBlanksFilled();
+            }
+            Optional<VerifiedPerson> person = response.toVerifiedPerson();
+            if (person.isEmpty()) {
+                // 값은 개인정보라 남기지 않고, 어느 칸이 비었는지만 남긴다
+                log.warn("본인확인 결과를 쓸 수 없음: id={}, status={}, 빈 칸={}", identityVerificationId, response.status(), response.blankFields());
+            }
+            return person;
         } catch (RestClientException e) {
             // 결과에 개인정보가 있어 응답 본문은 남기지 않는다
             log.warn("본인확인 결과 조회 실패: id={}, {}", identityVerificationId, e.getClass().getSimpleName());
@@ -52,6 +68,42 @@ public class PortOneIdentityVerifier implements IdentityVerifier {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Response(String id, String status, Customer verifiedCustomer, Instant verifiedAt) {
+
+        Response withSimulatorBlanksFilled() {
+            if (verifiedCustomer == null) {
+                return this;
+            }
+            Customer filled = new Customer(
+                verifiedCustomer.ci(),
+                verifiedCustomer.name(),
+                verifiedCustomer.gender() == null ? SIMULATOR_GENDER : verifiedCustomer.gender(),
+                verifiedCustomer.birthDate(),
+                verifiedCustomer.phoneNumber() == null ? SIMULATOR_PHONE : verifiedCustomer.phoneNumber());
+            return new Response(id, status, filled, verifiedAt);
+        }
+
+        List<String> blankFields() {
+            if (verifiedCustomer == null) {
+                return List.of("verifiedCustomer");
+            }
+            List<String> blanks = new ArrayList<>();
+            if (verifiedAt == null) {
+                blanks.add("verifiedAt");
+            }
+            if (verifiedCustomer.ci() == null) {
+                blanks.add("ci");
+            }
+            if (verifiedCustomer.phoneNumber() == null) {
+                blanks.add("phoneNumber");
+            }
+            if (verifiedCustomer.birthDate() == null) {
+                blanks.add("birthDate");
+            }
+            if (!"MALE".equals(verifiedCustomer.gender()) && !"FEMALE".equals(verifiedCustomer.gender())) {
+                blanks.add("gender");
+            }
+            return blanks;
+        }
 
         Optional<VerifiedPerson> toVerifiedPerson() {
             if (!"VERIFIED".equals(status) || verifiedCustomer == null || verifiedAt == null) {
