@@ -6,21 +6,24 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import com.swkitchen.auth.domain.Account;
 import com.swkitchen.auth.domain.RefreshToken;
-import com.swkitchen.auth.domain.Role;
 import com.swkitchen.auth.dto.AuthDto;
-import com.swkitchen.auth.repository.AccountRepository;
 import com.swkitchen.auth.repository.RefreshTokenRepository;
 import com.swkitchen.common.exception.AppException;
 import com.swkitchen.common.exception.ErrorCode;
 import com.swkitchen.common.security.CryptoUtil;
 import com.swkitchen.common.security.JwtProvider;
 import com.swkitchen.common.security.SecurityProperties;
+import com.swkitchen.common.security.TurnstileClient;
+import com.swkitchen.member.domain.Account;
+import com.swkitchen.member.domain.AccountStatus;
+import com.swkitchen.member.domain.Role;
+import com.swkitchen.member.repository.AccountRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -38,6 +41,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
+    private static final String IP = "203.0.113.7";
+
     @Mock
     AccountRepository accountRepository;
 
@@ -50,6 +55,12 @@ class AuthServiceTest {
     @Mock
     JwtProvider jwtProvider;
 
+    @Mock
+    LoginRateLimiter loginRateLimiter;
+
+    @Mock
+    TurnstileClient turnstileClient;
+
     AuthService authService;
     Account staff;
 
@@ -59,10 +70,18 @@ class AuthServiceTest {
             new SecurityProperties.Jwt("secret", Duration.ofMinutes(30), Duration.ofDays(14)),
             Map.of(),
             new SecurityProperties.InitialAdmin("admin", "init-pass"),
-            null);
-        authService = new AuthService(accountRepository, refreshTokenRepository, passwordEncoder, jwtProvider, properties);
+            null,
+            new SecurityProperties.Captcha("captcha-secret"));
+        authService = new AuthService(
+            accountRepository,
+            refreshTokenRepository,
+            passwordEncoder,
+            jwtProvider,
+            properties,
+            loginRateLimiter,
+            turnstileClient);
 
-        staff = Account.create("staff1", "hash", Role.STAFF);
+        staff = Account.create("staff1", "hash", "박담당", Role.STAFF);
         ReflectionTestUtils.setField(staff, "id", 1L);
     }
 
@@ -75,7 +94,7 @@ class AuthServiceTest {
         given(passwordEncoder.matches("pass1234", "hash")).willReturn(true);
         given(jwtProvider.createAccessToken(1L, Role.STAFF)).willReturn("access");
 
-        AuthDto.LoginResult result = authService.login(new AuthDto.LoginRequest("staff1", "pass1234"));
+        AuthDto.LoginResult result = authService.login(new AuthDto.LoginRequest("staff1", "pass1234", null), IP);
 
         ArgumentCaptor<RefreshToken> saved = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(saved.capture());
@@ -95,19 +114,20 @@ class AuthServiceTest {
         given(accountRepository.findByUserId("admin")).willReturn(Optional.of(staff));
         given(passwordEncoder.matches("init-pass", "hash")).willReturn(true);
 
-        AuthDto.LoginResult result = authService.login(new AuthDto.LoginRequest("admin", "init-pass"));
+        AuthDto.LoginResult result = authService.login(new AuthDto.LoginRequest("admin", "init-pass", null), IP);
 
         assertThat(result.passwordChangeRecommended()).isTrue();
     }
 
     @Test
-    @DisplayName("로그인: 비밀번호가 틀리면 LOGIN_FAILED 이고 토큰을 저장하지 않는다")
+    @DisplayName("로그인: 비밀번호가 틀리면 LOGIN_FAILED, 틀린 횟수를 하나 늘리고 토큰을 저장하지 않는다")
     void loginWrongPassword() {
         given(accountRepository.findByUserId("staff1")).willReturn(Optional.of(staff));
         given(passwordEncoder.matches("wrong", "hash")).willReturn(false);
 
-        assertErrorCode(() -> authService.login(new AuthDto.LoginRequest("staff1", "wrong")), ErrorCode.LOGIN_FAILED);
+        assertErrorCode(() -> authService.login(new AuthDto.LoginRequest("staff1", "wrong", null), IP), ErrorCode.LOGIN_FAILED);
         verify(refreshTokenRepository, never()).save(any());
+        verify(accountRepository).increaseLoginFailCount(1L);
     }
 
     @Test
@@ -115,8 +135,9 @@ class AuthServiceTest {
     void loginUnknownUserId() {
         given(accountRepository.findByUserId("nobody")).willReturn(Optional.empty());
 
-        assertErrorCode(() -> authService.login(new AuthDto.LoginRequest("nobody", "pass1234")), ErrorCode.LOGIN_FAILED);
+        assertErrorCode(() -> authService.login(new AuthDto.LoginRequest("nobody", "pass1234", null), IP), ErrorCode.LOGIN_FAILED);
         verify(passwordEncoder).matches(eq("pass1234"), anyString());
+        verify(accountRepository, never()).increaseLoginFailCount(any());
     }
 
     @Test
@@ -124,9 +145,86 @@ class AuthServiceTest {
     void loginTooLongPassword() {
         given(accountRepository.findByUserId("staff1")).willReturn(Optional.of(staff));
 
-        assertErrorCode(() -> authService.login(new AuthDto.LoginRequest("staff1", "가".repeat(25))),
+        assertErrorCode(() -> authService.login(new AuthDto.LoginRequest("staff1", "가".repeat(25), null), IP),
             ErrorCode.LOGIN_FAILED);
         verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("로그인 성공: 틀린 횟수를 0 으로 되돌리고 응답에 이름을 담는다")
+    void loginResetsFailCount() {
+        ReflectionTestUtils.setField(staff, "loginFailCount", 3);
+        given(accountRepository.findByUserId("staff1")).willReturn(Optional.of(staff));
+        given(passwordEncoder.matches("pass1234", "hash")).willReturn(true);
+
+        AuthDto.LoginResult result = authService.login(new AuthDto.LoginRequest("staff1", "pass1234", null), IP);
+
+        assertThat(staff.getLoginFailCount()).isZero();
+        assertThat(result.name()).isEqualTo("박담당");
+    }
+
+    @Test
+    @DisplayName("로그인: 이 IP 가 막혔으면 LOGIN_RATE_LIMITED 이고 계정을 찾지도 않는다")
+    void loginRateLimited() {
+        willThrow(new AppException(ErrorCode.LOGIN_RATE_LIMITED)).given(loginRateLimiter).check(IP);
+
+        assertErrorCode(() -> authService.login(new AuthDto.LoginRequest("staff1", "pass1234", null), IP),
+            ErrorCode.LOGIN_RATE_LIMITED);
+        verifyNoInteractions(accountRepository, passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("로그인: 5번 틀린 아이디는 보안문자가 틀리면 맞는 비밀번호여도 CAPTCHA_REQUIRED, 비밀번호는 보지 않는다")
+    void loginCaptchaRequired() {
+        ReflectionTestUtils.setField(staff, "loginFailCount", 5);
+        given(accountRepository.findByUserId("staff1")).willReturn(Optional.of(staff));
+        given(turnstileClient.verify(null, IP)).willReturn(false);
+
+        assertErrorCode(() -> authService.login(new AuthDto.LoginRequest("staff1", "pass1234", null), IP),
+            ErrorCode.CAPTCHA_REQUIRED);
+        verifyNoInteractions(passwordEncoder);
+        verify(accountRepository, never()).increaseLoginFailCount(any());
+    }
+
+    @Test
+    @DisplayName("로그인: 5번 틀린 아이디도 보안문자를 맞히고 맞는 비밀번호면 로그인되고 틀린 횟수가 0 이 된다")
+    void loginWithCaptcha() {
+        ReflectionTestUtils.setField(staff, "loginFailCount", 5);
+        given(accountRepository.findByUserId("staff1")).willReturn(Optional.of(staff));
+        given(turnstileClient.verify("captcha-token", IP)).willReturn(true);
+        given(passwordEncoder.matches("pass1234", "hash")).willReturn(true);
+
+        authService.login(new AuthDto.LoginRequest("staff1", "pass1234", "captcha-token"), IP);
+
+        assertThat(staff.getLoginFailCount()).isZero();
+        verify(refreshTokenRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("로그인: 4번까지 틀린 아이디는 보안문자를 묻지 않는다")
+    void loginWithoutCaptchaUnderLimit() {
+        ReflectionTestUtils.setField(staff, "loginFailCount", 4);
+        given(accountRepository.findByUserId("staff1")).willReturn(Optional.of(staff));
+        given(passwordEncoder.matches("pass1234", "hash")).willReturn(true);
+
+        authService.login(new AuthDto.LoginRequest("staff1", "pass1234", null), IP);
+
+        verifyNoInteractions(turnstileClient);
+    }
+
+    @Test
+    @DisplayName("로그인: 정지한 계정은 비밀번호가 맞으면 ACCOUNT_SUSPENDED, 틀리면 LOGIN_FAILED")
+    void loginSuspended() {
+        ReflectionTestUtils.setField(staff, "status", AccountStatus.SUSPENDED);
+        given(accountRepository.findByUserId("staff1")).willReturn(Optional.of(staff));
+        given(passwordEncoder.matches("pass1234", "hash")).willReturn(true);
+        given(passwordEncoder.matches("wrong", "hash")).willReturn(false);
+
+        assertErrorCode(() -> authService.login(new AuthDto.LoginRequest("staff1", "pass1234", null), IP),
+            ErrorCode.ACCOUNT_SUSPENDED);
+        assertErrorCode(() -> authService.login(new AuthDto.LoginRequest("staff1", "wrong", null), IP),
+            ErrorCode.LOGIN_FAILED);
+        verify(refreshTokenRepository, never()).save(any());
     }
 
     // ── 로그아웃 ──
@@ -148,16 +246,24 @@ class AuthServiceTest {
         verifyNoInteractions(refreshTokenRepository);
     }
 
+    @Test
+    @DisplayName("모든 기기 로그아웃: 그 계정의 리프레시 토큰을 모두 지운다")
+    void logoutAll() {
+        authService.logoutAll(1L);
+
+        verify(refreshTokenRepository).deleteByAccountId(1L);
+    }
+
     // ── 내 정보 ──
 
     @Test
-    @DisplayName("내 정보: 로그인한 계정의 id·아이디·역할을 준다")
+    @DisplayName("내 정보: 로그인한 계정의 id·아이디·이름·역할을 준다")
     void me() {
         given(accountRepository.findById(1L)).willReturn(Optional.of(staff));
 
         AuthDto.MeResponse me = authService.me(1L);
 
-        assertThat(me).isEqualTo(new AuthDto.MeResponse(1L, "staff1", Role.STAFF));
+        assertThat(me).isEqualTo(new AuthDto.MeResponse(1L, "staff1", "박담당", Role.STAFF));
     }
 
     @Test
@@ -171,7 +277,7 @@ class AuthServiceTest {
     // ── 토큰 재발급 ──
 
     @Test
-    @DisplayName("재발급: 쓴 리프레시 토큰 행은 지우고, 새 토큰을 해시로 14일 뒤 만료로 저장한다")
+    @DisplayName("재발급: 쓴 리프레시 토큰 행은 지우지 않고 바뀐 시각을 적고, 새 토큰을 해시로 14일 뒤 만료로 저장한다")
     void refresh() {
         RefreshToken old = RefreshToken.create(staff, CryptoUtil.sha256("old"), LocalDateTime.now().plusDays(1));
         given(refreshTokenRepository.findByTokenHash(CryptoUtil.sha256("old"))).willReturn(Optional.of(old));
@@ -179,7 +285,8 @@ class AuthServiceTest {
 
         AuthDto.RefreshResult result = authService.refresh("old");
 
-        verify(refreshTokenRepository).delete(old);
+        verify(refreshTokenRepository, never()).delete(any());
+        assertThat(old.getRotatedAt()).isBetween(LocalDateTime.now().minusMinutes(1), LocalDateTime.now());
         ArgumentCaptor<RefreshToken> saved = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(saved.capture());
         assertThat(result.accessToken()).isEqualTo("access");
@@ -190,13 +297,48 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("재발급: 만료된 토큰은 행을 지우고 UNAUTHORIZED, 새 토큰은 주지 않는다")
+    @DisplayName("재발급: 바뀐 지 30초가 안 된 토큰은 새 토큰을 하나 더 주고, 처음 바뀐 시각은 그대로 둔다")
+    void refreshWithinGraceTime() {
+        LocalDateTime rotatedAt = LocalDateTime.now().minusSeconds(20);
+        RefreshToken old = RefreshToken.create(staff, CryptoUtil.sha256("old"), LocalDateTime.now().plusDays(1));
+        ReflectionTestUtils.setField(old, "rotatedAt", rotatedAt);
+        given(refreshTokenRepository.findByTokenHash(CryptoUtil.sha256("old"))).willReturn(Optional.of(old));
+
+        authService.refresh("old");
+
+        assertThat(old.getRotatedAt()).isEqualTo(rotatedAt);
+        verify(refreshTokenRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("재발급: 바뀐 지 30초가 지난 토큰은 UNAUTHORIZED, 새 토큰은 주지 않는다")
+    void refreshAfterGraceTime() {
+        RefreshToken old = RefreshToken.create(staff, CryptoUtil.sha256("old"), LocalDateTime.now().plusDays(1));
+        ReflectionTestUtils.setField(old, "rotatedAt", LocalDateTime.now().minusSeconds(30));
+        given(refreshTokenRepository.findByTokenHash(CryptoUtil.sha256("old"))).willReturn(Optional.of(old));
+
+        assertErrorCode(() -> authService.refresh("old"), ErrorCode.UNAUTHORIZED);
+        verify(refreshTokenRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("재발급: 만료된 토큰은 UNAUTHORIZED, 새 토큰은 주지 않는다")
     void refreshExpired() {
         RefreshToken old = RefreshToken.create(staff, CryptoUtil.sha256("old"), LocalDateTime.now().minusSeconds(1));
         given(refreshTokenRepository.findByTokenHash(CryptoUtil.sha256("old"))).willReturn(Optional.of(old));
 
         assertErrorCode(() -> authService.refresh("old"), ErrorCode.UNAUTHORIZED);
-        verify(refreshTokenRepository).delete(old);
+        verify(refreshTokenRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("재발급: 정지한 계정은 UNAUTHORIZED, 새 토큰은 주지 않는다")
+    void refreshSuspended() {
+        ReflectionTestUtils.setField(staff, "status", AccountStatus.SUSPENDED);
+        RefreshToken old = RefreshToken.create(staff, CryptoUtil.sha256("old"), LocalDateTime.now().plusDays(1));
+        given(refreshTokenRepository.findByTokenHash(CryptoUtil.sha256("old"))).willReturn(Optional.of(old));
+
+        assertErrorCode(() -> authService.refresh("old"), ErrorCode.UNAUTHORIZED);
         verify(refreshTokenRepository, never()).save(any());
     }
 

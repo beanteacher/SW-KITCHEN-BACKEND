@@ -1,6 +1,6 @@
 package com.swkitchen.common.security;
 
-import com.swkitchen.auth.domain.Role;
+import com.swkitchen.member.domain.Role;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -12,11 +12,14 @@ public record SecurityProperties(
         Jwt jwt,
         Map<Role, List<String>> rolePermissions,
         InitialAdmin initialAdmin,
-        Boolean cookieSecure) {
+        Boolean cookieSecure,
+        Captcha captcha) {
 
     public record Jwt(String secret, Duration accessTokenTtl, Duration refreshTokenTtl) {}
 
     public record InitialAdmin(String userId, String password) {}
+
+    public record Captcha(String secretKey) {}
 
     public boolean isCookieSecure() {
         return !Boolean.FALSE.equals(cookieSecure);

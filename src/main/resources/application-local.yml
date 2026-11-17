@@ -1,5 +1,8 @@
-# docker-compose.yml 의 MySQL
 spring:
+  # 카카오·네이버·포트원 키는 프로젝트 폴더의 .env 에 둔다 (git 에 올리지 않는다). 없어도 켜진다
+  config:
+    import: optional:file:.env[.properties]
+  # docker-compose.yml 의 MySQL
   datasource:
     url: jdbc:mysql://localhost:3306/sw_kitchen?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: sw_kitchen
@@ -10,17 +13,31 @@ decorator:
   datasource:
     enabled: true
 
+# KCP 테스트(시뮬레이터)는 휴대폰 번호·성별을 비워 준다. 로컬에서만 테스트 값(01000000000, 남)으로 채워 다음 단계로 넘어간다.
+# CI 도 늘 같은 가짜 값이라 로컬의 테스트 본인확인은 모두 같은 사람으로 본다. 운영은 꺼져 있어 빈 칸이 있으면 실패한다
+portone:
+  fill-simulator-blanks: true
+
 security:
   # Safari 는 http://localhost 에서 Secure 쿠키를 저장하지 않는다. 운영(https)은 기본값(켬)을 쓴다
   cookie-secure: false
+  # 한 IP 의 1분 로그인 시도 상한. 운영은 기본 20 이고, 로컬은 E2E 가 여러 번 로그인해서 넉넉히 둔다
+  login-attempts-per-minute: 200
   jwt:
     secret: local-only-secret-change-me-0123456789abcdef   # 32바이트 이상
   # 계정이 하나도 없을 때만 만든다
   initial-admin:
     user-id: admin
     password: "1234"   # 이 비밀번호로 로그인하면 변경 안내가 뜬다
+  # Cloudflare 가 주는 테스트용 키. 어떤 보안문자 값이든 통과한다
+  captcha:
+    secret-key: 1x0000000000000000000000000000000AA
 image:
   base-url: http://localhost:4566/sw-kitchen   # docker compose 의 LocalStack
 storage:
   bucket: sw-kitchen
   endpoint: http://localhost:4566
+# 로컬 전용 키 (base64 32바이트). 운영은 환경 변수로 다른 값을 넣는다
+encryption:
+  privacy-key: bG9jYWwtb25seS1wcml2YWN5LWtleS0wMTIzNDU2Nzg=
+  cookie-key: bG9jYWwtb25seS1jb29raWUta2V5LTAxMjM0NTY3ODk=

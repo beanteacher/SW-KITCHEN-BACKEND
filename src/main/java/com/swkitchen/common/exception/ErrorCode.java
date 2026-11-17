@@ -14,6 +14,28 @@ public enum ErrorCode {
     LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 맞지 않습니다."),
     // 401 이면 화면이 로그인 만료로 보고 토큰을 새로 받으러 가므로 400 으로 둔다
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "현재 비밀번호가 맞지 않습니다."),
+    CAPTCHA_REQUIRED(HttpStatus.BAD_REQUEST, "보안문자를 확인해 주세요."),
+    LOGIN_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "로그인 시도가 너무 많습니다. 10분 뒤에 다시 시도해 주세요."),
+    // 비밀번호가 맞을 때만 알린다
+    ACCOUNT_SUSPENDED(HttpStatus.FORBIDDEN, "정지된 계정입니다. 관리자에게 문의해 주세요."),
+    // 업체 결과가 완료가 아님, 10분 지남, 이미 쓴 건
+    IDENTITY_VERIFICATION_FAILED(HttpStatus.BAD_REQUEST, "본인확인을 마치지 못했습니다. 다시 시도해 주세요."),
+    // 401 이면 화면이 토큰을 새로 받으러 가므로 400 으로 둔다
+    IDENTITY_VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "본인확인 시간이 지났습니다. 다시 본인확인해 주세요."),
+    UNDER_AGE(HttpStatus.BAD_REQUEST, "만 14세 미만은 가입할 수 없습니다."),
+    // 같은 사람(CI)의 고객 계정이 이미 있다. 화면이 본인확인 결과로 미리 안내하므로 동시에 두 번 가입할 때만 난다
+    ACCOUNT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 가입한 계정이 있습니다."),
+    ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "가입한 계정이 없습니다."),
+    // 비밀번호 재설정에서 입력한 아이디가 본인확인한 사람의 계정이 아님, 휴대폰 번호 변경의 본인확인이 다른 사람
+    IDENTITY_MISMATCH(HttpStatus.CONFLICT, "본인확인한 분의 계정이 아닙니다."),
+    NO_PASSWORD_ACCOUNT(HttpStatus.CONFLICT, "카카오·네이버로 가입한 계정은 비밀번호가 없습니다."),
+    // 소셜로만 가입한 계정이 소셜 로그인을 다시 하지 않고 탈퇴
+    REAUTH_REQUIRED(HttpStatus.BAD_REQUEST, "탈퇴하려면 가입한 소셜 계정으로 다시 로그인해 주세요."),
+    SOCIAL_SIGNUP_EXPIRED(HttpStatus.BAD_REQUEST, "시간이 지났습니다. 카카오·네이버 로그인부터 다시 해 주세요."),
+    SOCIAL_ALREADY_LINKED(HttpStatus.CONFLICT, "이 계정에는 이미 다른 소셜 계정이 연결되어 있습니다."),
+    USER_ID_DUPLICATE(HttpStatus.CONFLICT, "이미 쓰고 있는 아이디입니다."),
+    STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "직원 계정을 찾을 수 없습니다."),
+    SELF_CHANGE_NOT_ALLOWED(HttpStatus.CONFLICT, "자기 계정은 정지하거나 역할을 바꿀 수 없습니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 주소를 찾을 수 없습니다."),
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "분류를 찾을 수 없습니다."),

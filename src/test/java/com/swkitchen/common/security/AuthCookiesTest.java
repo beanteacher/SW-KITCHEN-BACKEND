@@ -29,6 +29,6 @@ class AuthCookiesTest {
 
     private static AuthCookies cookies(Boolean secure) {
         var jwt = new SecurityProperties.Jwt("secret", Duration.ofMinutes(30), Duration.ofDays(14));
-        return new AuthCookies(new SecurityProperties(jwt, Map.of(), null, secure));
+        return new AuthCookies(new SecurityProperties(jwt, Map.of(), null, secure, null));
     }
 }

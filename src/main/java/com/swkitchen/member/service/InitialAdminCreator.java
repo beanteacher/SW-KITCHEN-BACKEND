@@ -1,9 +1,9 @@
-package com.swkitchen.auth.service;
+package com.swkitchen.member.service;
 
-import com.swkitchen.auth.domain.Account;
-import com.swkitchen.auth.domain.Role;
-import com.swkitchen.auth.repository.AccountRepository;
 import com.swkitchen.common.security.SecurityProperties;
+import com.swkitchen.member.domain.Account;
+import com.swkitchen.member.domain.Role;
+import com.swkitchen.member.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -18,6 +18,8 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class InitialAdminCreator implements ApplicationRunner {
 
+    private static final String INITIAL_ADMIN_NAME = "관리자";
+
     private final AccountRepository accountRepository;
     private final PasswordEncoder passwordEncoder;
     private final SecurityProperties properties;
@@ -31,7 +33,11 @@ public class InitialAdminCreator implements ApplicationRunner {
         if (accountRepository.count() > 0) {
             return;
         }
-        accountRepository.save(Account.create(admin.userId(), passwordEncoder.encode(admin.password()), Role.ADMIN));
+        accountRepository.save(Account.create(
+            admin.userId(),
+            passwordEncoder.encode(admin.password()),
+            INITIAL_ADMIN_NAME,
+            Role.ADMIN));
         log.info("첫 관리자 계정을 만들었습니다: {}", admin.userId());
     }
 }
